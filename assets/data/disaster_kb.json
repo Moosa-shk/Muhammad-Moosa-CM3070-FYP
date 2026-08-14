@@ -1,0 +1,27 @@
+[
+    {
+      "title": "Earthquake Safety",
+      "keywords": ["earthquake", "zalzala", "tremor", "shaking"],
+      "answer": "Earthquake me: Drop, Cover, Hold On. Windows se door rahen, lift use na karein, shaking ke baad gas/electric check karein."
+    },
+    {
+      "title": "Flood Safety",
+      "keywords": ["flood", "baarish", "barish", "pani", "flash flood"],
+      "answer": "Flood me: pani me na chalein na drive karein. High ground par move karein. Updates follow karein. Electric lines se door rahen."
+    },
+    {
+      "title": "Fire Safety",
+      "keywords": ["fire", "aag", "smoke", "burn"],
+      "answer": "Fire me: Stop, Drop, Roll (agar kapray jal rahe hon). Smoke me low ho kar move karein. Stairs use karein, elevator nahi."
+    },
+    {
+      "title": "Emergency Kit",
+      "keywords": ["kit", "bag", "go bag", "emergency kit", "supplies"],
+      "answer": "Emergency kit: water, dry food, torch, power bank, first aid, medicines, IDs copies, whistle, mask, cash, radio."
+    },
+    {
+      "title": "SOS Help",
+      "keywords": ["sos", "help", "emergency", "call", "sms", "whatsapp"],
+      "answer": "SOS ke liye app me SOS button use karein. Message me apni location + short note add karein. Emergency contact verify karein."
+    }
+  ]

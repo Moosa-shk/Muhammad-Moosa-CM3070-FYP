@@ -1,0 +1,33 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub/
+build/
+flutter_*.png
+
+# iOS
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android/Gradle
+android/.gradle/
+android/app/build/
+android/build/
+*.keystore
+*.jks
+key.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Firebase / secrets
+google-services.json
+GoogleService-Info.plist
+.env
+.env.*

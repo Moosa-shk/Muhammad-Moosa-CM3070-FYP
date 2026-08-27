@@ -1,51 +1,57 @@
 // lib/services/notification_service.dart
+
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// This service handles all local notifications in the app.
-/// It initializes the notification plugin, requests permissions,
-/// and provides helper functions to show different notification types.
 class LocalNotificationService {
-
-  /// Main plugin used for showing local notifications
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  /// Notification channel details (mainly used on Android)
+  // IMPORTANT:
+  // Internal channel ID preserved to avoid breaking existing behavior.
   static const String _channelId = 'disasteraid_alerts';
-  static const String _channelName = 'DisasterAid Alerts';
-  static const String _channelDesc = 'Important account and safety alerts';
 
-  /// Initializes the notification system when the app starts
+  // Visible channel name updated only.
+  static const String _channelName = 'RescueAid Alerts';
+
+  static const String _channelDesc =
+      'Important account and safety alerts';
+
+  // ===============================================================
+  // INITIALIZATION
+  // ===============================================================
+
   static Future<void> init() async {
+    const androidInit = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
 
-    // Android initialization settings
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    // iOS initialization settings
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
 
-    // Combine platform settings
     const initSettings = InitializationSettings(
       android: androidInit,
       iOS: iosInit,
     );
 
-    // Initialize notification plugin
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(
+      initSettings,
+    );
 
-    // Create Android notification channel
     await _ensureAndroidChannel();
-
-    // Request notification permissions
     await _requestPermissions();
   }
 
-  /// Creates the Android notification channel if it doesn't exist
+  // ===============================================================
+  // ANDROID CHANNEL
+  // EXISTING BEHAVIOUR PRESERVED
+  // ===============================================================
+
   static Future<void> _ensureAndroidChannel() async {
     final androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<
@@ -60,13 +66,16 @@ class LocalNotificationService {
       importance: Importance.max,
     );
 
-    await androidPlugin.createNotificationChannel(channel);
+    await androidPlugin.createNotificationChannel(
+      channel,
+    );
   }
 
-  /// Requests notification permissions for both Android and iOS
-  static Future<void> _requestPermissions() async {
+  // ===============================================================
+  // PERMISSIONS
+  // ===============================================================
 
-    // iOS permission request
+  static Future<void> _requestPermissions() async {
     final iosPlugin =
         _plugin.resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin>();
@@ -78,119 +87,213 @@ class LocalNotificationService {
         sound: true,
       );
 
-      print('🔔 iOS Notification Permission Status: $granted');
+      debugPrint(
+        'iOS Notification Permission Status: $granted',
+      );
     }
 
-    // Android permission request (Android 13+)
     final androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null && Platform.isAndroid) {
-      final granted = await androidPlugin.requestNotificationsPermission();
+      final granted =
+          await androidPlugin.requestNotificationsPermission();
 
-      print('🔔 Android Notification Permission Status: $granted');
+      debugPrint(
+        'Android Notification Permission Status: $granted',
+      );
     }
   }
 
-  /// Generates a unique notification ID
-  static int _id() => DateTime.now().millisecondsSinceEpoch.remainder(1 << 31);
+  // ===============================================================
+  // UNIQUE ID
+  // ===============================================================
 
-  /// Creates notification configuration (priority, importance etc.)
-  static NotificationDetails _details({bool urgent = false}) {
+  static int _id() {
+    return DateTime.now()
+        .millisecondsSinceEpoch
+        .remainder(1 << 31);
+  }
 
-    final androidDetails = AndroidNotificationDetails(
+  // ===============================================================
+  // NORMAL NOTIFICATION
+  // Login / Signup
+  // ===============================================================
+
+  static NotificationDetails _normalDetails() {
+    const androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
       channelDescription: _channelDesc,
-      importance: urgent ? Importance.max : Importance.high,
-      priority: urgent ? Priority.high : Priority.defaultPriority,
+      importance: Importance.high,
+      priority: Priority.defaultPriority,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentSound: true,
       presentBadge: true,
+      interruptionLevel: InterruptionLevel.active,
     );
 
-    return NotificationDetails(
+    return const NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
   }
 
-  // -------------------------------
-  // Auth notifications
-  // -------------------------------
+  // ===============================================================
+  // EMERGENCY NOTIFICATION
+  // ===============================================================
 
-  /// Shows a welcome notification after signup
-  static Future<void> showSignupWelcome(String name) async {
-    await _plugin.show(
-      _id(),
-      'Welcome to DisasterAid_FYP 👋',
-      'Stay safe, $name',
-      _details(),
+  static NotificationDetails _emergencyDetails() {
+    const androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDesc,
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+      presentBadge: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+
+    return const NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
     );
   }
 
-  /// Shows a welcome back notification after login
-  static Future<void> showLoginWelcome(String name) async {
+  // ===============================================================
+  // SIGNUP
+  // ===============================================================
+
+  static Future<void> showSignupWelcome(
+    String name,
+  ) async {
+    final cleanName = name.trim();
+
     await _plugin.show(
       _id(),
-      'Welcome back 👋',
-      'Good to see you again, $name',
-      _details(),
+      'You’re all set',
+      cleanName.isEmpty
+          ? 'Your RescueAid account is ready.'
+          : 'Welcome, $cleanName. Your account is ready.',
+      _normalDetails(),
     );
   }
 
-  // -------------------------------
-  // SOS notifications
-  // -------------------------------
+  // ===============================================================
+  // LOGIN
+  // ===============================================================
 
-  /// Notification when an SOS message is prepared
+  static Future<void> showLoginWelcome(
+    String name,
+  ) async {
+    final cleanName = name.trim();
+
+    await _plugin.show(
+      _id(),
+      'Welcome back',
+      cleanName.isEmpty
+          ? 'You’re signed in to RescueAid.'
+          : 'Signed in as $cleanName.',
+      _normalDetails(),
+    );
+  }
+
+  // ===============================================================
+  // SOS PREPARED
+  // ===============================================================
+
   static Future<void> sosPrepared({
     required String channel,
     required String emergency,
   }) async {
     await _plugin.show(
       _id(),
-      'SOS Ready',
-      '$channel prepared for $emergency',
-      _details(urgent: true),
+      'SOS ready to send',
+      '$channel is prepared for $emergency.',
+      _emergencyDetails(),
     );
   }
 
-  /// Notification when SOS action opens another app
+  // ===============================================================
+  // SOS OPENED
+  // ===============================================================
+
   static Future<void> sosOpened({
     required String channel,
   }) async {
+    final lowerChannel =
+        channel.trim().toLowerCase();
+
+    final isSms =
+        lowerChannel.contains('sms');
+
+    final isWhatsApp =
+        lowerChannel.contains('whatsapp');
+
+    String title;
+    String message;
+
+    if (isSms) {
+      title = 'SOS message opened';
+      message =
+          'Review the message, then tap Send.';
+    } else if (isWhatsApp) {
+      title = 'WhatsApp opened';
+      message =
+          'Review your SOS message and send it when ready.';
+    } else {
+      title = '$channel opened';
+      message =
+          'Complete the emergency action in the opened app.';
+    }
+
     await _plugin.show(
       _id(),
-      '$channel Opened',
-      channel.toLowerCase().contains('sms')
-          ? 'Tap Send in Messages to deliver SOS'
-          : 'Complete action in opened app',
-      _details(urgent: true),
+      title,
+      message,
+      _emergencyDetails(),
     );
   }
 
-  /// Notification when SOS is sent directly from Android
+  // ===============================================================
+  // SOS SENT
+  // ===============================================================
+
   static Future<void> sosSentAndroidDirect() async {
     await _plugin.show(
       _id(),
-      'SOS Sent ✅',
-      'Direct SMS sent from your phone',
-      _details(urgent: true),
+      'SOS sent',
+      'Your emergency message was sent successfully.',
+      _emergencyDetails(),
     );
   }
 
-  /// Notification shown if SOS sending fails
-  static Future<void> sosFailed(String reason) async {
+  // ===============================================================
+  // SOS FAILED
+  // ===============================================================
+
+  static Future<void> sosFailed(
+    String reason,
+  ) async {
+    final cleanReason =
+        reason.trim();
+
     await _plugin.show(
       _id(),
-      'SOS Failed',
-      reason,
-      _details(urgent: true),
+      'Couldn’t send SOS',
+      cleanReason.isEmpty
+          ? 'The emergency action could not be completed.'
+          : cleanReason,
+      _emergencyDetails(),
     );
   }
 }

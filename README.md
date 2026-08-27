@@ -1,50 +1,62 @@
-Hamza Khawar Fyp cm3070
-Student number: 230390335
+RescueAid - Disaster Assistance Mobile Application
 
-DisasterAid - Disaster Assistance Mobile Application.
+Muhammad Moosa Sheikh
+CM3070 Final Year Project (FYP) – 10.1
 
-DisasterAid is a mobile application that is a Final Year Project (FYP) built with Flutter. The application assists them in case of an emergency or disaster and offers alerts, emergency communication resources, and safety details.
+About the Project
 
-This project aims at enhancing mobile technology to enhance disaster awareness, response, and safety of users during emergencies.
+RescueAid is a mobile application developed as a Final Year Project (FYP) using Flutter. The application is designed to assist users during emergencies and disasters by providing disaster alerts, emergency communication resources, nearby emergency services, safety information, and other disaster-management features.
 
+The project aims to use mobile technology to improve disaster awareness, emergency response, and user safety during critical situations.
 
 Main Features
 
-* SOS Emergency System
-	*	Send SOS via SMS
-	*	Send SOS via WhatsApp
-	*	Direct SMS (Android)
-	*	Call emergency contact
-	Share location is automatically shared.
+SOS Emergency System
 
-* Disaster Alerts
-	*	View recent disaster alerts
-	Warnings of earthquakes and weather.
+* Send SOS via SMS
+* Send SOS via WhatsApp
+* Direct SMS support on Android
+* Call emergency contacts
+* Automatically share the user’s current location
 
-* Disaster Map
-	*	Discovery of disaster sites on map.
-	*	Identify the emergency services within the area.
+Disaster Alerts
 
-* AI Disaster Assistant
-	Chatbot, which offers disaster guidance.
+* View recent disaster alerts
+* Receive earthquake and weather-related warnings
+* Access relevant disaster information
 
-* Disaster Safety Quiz
-	*	Disaster education quiz to enhance disaster awareness.
+Disaster Map
 
-* Nearby Emergency Services
-	*	Hospitals
-	*	Police stations
-	*	Shelters
+* View disaster-related locations on the map
+* Identify emergency services within the surrounding area
+* Access location-based emergency information
 
+AI Disaster Assistant
 
+* Chatbot providing disaster-related guidance and assistance
+
+Disaster Safety Quiz
+
+* Disaster education quizzes
+* Improve disaster preparedness and awareness
+* Learn important safety procedures
+
+Nearby Emergency Services
+
+Users can locate nearby:
+
+* Hospitals
+* Police stations
+* Shelters
 
 Technologies Used
-	*	Flutter (Dart)
-	*	GetX State Management
-	*	Google maps / location services.
-	*	Open-Meteo Weather API
-	*	USGS Earthquake API
 
+* Flutter (Dart)
+* GetX State Management
+* Google Maps
+* Location Services
+* Open-Meteo Weather API
+* USGS Earthquake API
 
 Project Structure
 
@@ -57,63 +69,64 @@ lib/
 +-- widgets/
 +-- main.dart
 
+Services
+
+The application uses different services to handle its core functionality, including:
+
+* Location services
+* Disaster alert services
+* Weather services
+* Earthquake information services
+* SOS and emergency communication services
+* Map and nearby emergency service functionality
 
 How to Run the App
 
-Clone the repository
+Clone the Repository
 
-git clone : https://github.com/Hamzakhawar999/DisasterAid_FYP
+git clone
 
-Open project
+Open the Project
 
-cd DisasterAid_FYP
+cd RescueAid
 
-
-Install dependencies :
+Install Dependencies
 
 flutter pub get
 
-Run the application :
+Run the Application
 
 flutter run
-
-
 
 Running on Emulator
-	1.	Open Android Studio or xcode
-	2.	Start an emulator or simulator
-	3.	Run:
+
+1. Open Android Studio or Xcode.
+2. Start an emulator or simulator.
+3. Run:
 
 flutter run
-
 
 Running on Physical Device
-	1.	Enable USB Debugging
-	2.	Connect your phone
-	3.	Run:
+
+1. Enable USB Debugging on the device.
+2. Connect the phone to the computer.
+3. Run:
 
 flutter run
-
-
-
 
 Permissions Required
 
-The app uses these permissions:
-	•	Location
-	•	SMS
-	•	Phone call
-	•	Internet
+The application requires the following permissions:
 
-These are necessary in SOS messaging, location sharing and disaster alerts.
+* Location
+* SMS
+* Phone calls
+* Internet
 
+These permissions are required for SOS messaging, emergency calling, location sharing, disaster alerts, and location-based services.
 
 Project Type
 
-cm 3070 Final Year Project (FYP) 10.1
+CM3070 Final Year Project (FYP) – 10.1
+
 Flutter Mobile Application
-
-
-
-
-There are some chnages

@@ -4,9 +4,19 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// LinkText widget displays text that may contain URLs.
-/// If a URL is detected, it becomes a clickable link that
-/// opens in the device's external browser.
+import '../config/colors.dart';
+import 'popup_utils.dart';
+
+/// Reusable rich text widget that automatically detects URLs
+/// and converts them into interactive links.
+///
+/// Existing usage remains unchanged:
+///
+/// LinkText(
+///   text,
+///   style: ...,
+///   linkStyle: ...,
+/// )
 class LinkText extends StatelessWidget {
   const LinkText(
     this.text, {
@@ -16,95 +26,212 @@ class LinkText extends StatelessWidget {
     this.maxLines,
   });
 
-  /// Text content that may contain URLs
   final String text;
 
-  /// Default text style for normal text
+  /// Normal text styling supplied by the parent.
   final TextStyle style;
 
-  /// Style used for clickable links
+  /// Custom link styling supplied by the parent.
   final TextStyle linkStyle;
 
-  /// Optional maximum number of lines to display
   final int? maxLines;
 
-  /// Regular expression used to detect URLs in the text
-  static final _url = RegExp(r'(https?:\/\/[^\s]+)');
+  // ===============================================================
+  // URL DETECTION
+  // ===============================================================
+
+  static final RegExp _url = RegExp(
+    r'(https?:\/\/[^\s]+)',
+    caseSensitive: false,
+  );
+
+  // ===============================================================
+  // OPEN LINK
+  // ===============================================================
+
+  Future<void> _openUrl(String value) async {
+    // Remove common punctuation that may appear directly
+    // after a URL in normal sentences.
+    final cleanedUrl = value.replaceFirst(
+      RegExp(r'[.,!?;:]+$'),
+      '',
+    );
+
+    final uri = Uri.tryParse(cleanedUrl);
+
+    if (uri == null) {
+      PopupUtils.warning(
+        'Invalid Link',
+        'This link could not be opened.',
+      );
+      return;
+    }
+
+    try {
+      final canOpen = await canLaunchUrl(uri);
+
+      if (!canOpen) {
+        PopupUtils.warning(
+          'Unable to Open Link',
+          'No application is available to open this link.',
+        );
+        return;
+      }
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        PopupUtils.warning(
+          'Unable to Open Link',
+          'The link could not be opened.',
+        );
+      }
+    } catch (_) {
+      PopupUtils.error(
+        'Link Error',
+        'Something went wrong while opening the link.',
+      );
+    }
+  }
+
+  // ===============================================================
+  // BUILD
+  // ===============================================================
 
   @override
   Widget build(BuildContext context) {
-
-    /// List of text spans used to build the rich text widget
-    final spans = <TextSpan>[];
-
-    /// Find all URLs in the provided text
     final matches = _url.allMatches(text).toList();
 
-    /// If no URLs exist, display plain text
+    // =============================================================
+    // NORMAL TEXT
+    // =============================================================
+
     if (matches.isEmpty) {
-      return Text(text, style: style, maxLines: maxLines);
+      return Text(
+        text,
+        style: style,
+        maxLines: maxLines,
+        overflow:
+            maxLines != null ? TextOverflow.ellipsis : TextOverflow.visible,
+      );
     }
 
-    int idx = 0;
+    final spans = <InlineSpan>[];
 
-    /// Process text and convert detected URLs into clickable spans
-    for (final m in matches) {
+    int currentIndex = 0;
 
-      /// Add normal text before the detected URL
-      if (m.start > idx) {
+    // =============================================================
+    // CREATE RICH TEXT
+    // =============================================================
+
+    for (final match in matches) {
+      // -----------------------------------------------------------
+      // TEXT BEFORE URL
+      // -----------------------------------------------------------
+
+      if (match.start > currentIndex) {
         spans.add(
           TextSpan(
-            text: text.substring(idx, m.start),
+            text: text.substring(
+              currentIndex,
+              match.start,
+            ),
             style: style,
           ),
         );
       }
 
-      /// Extract the detected URL
-      final url = text.substring(m.start, m.end);
+      final rawUrl = text.substring(
+        match.start,
+        match.end,
+      );
 
-      /// Create a clickable link span
+      // Remove punctuation from actual clickable URL.
+      final cleanUrl = rawUrl.replaceFirst(
+        RegExp(r'[.,!?;:]+$'),
+        '',
+      );
+
+      // Anything removed from the URL should remain visible as
+      // normal punctuation after the clickable link.
+      final trailingText = rawUrl.substring(
+        cleanUrl.length,
+      );
+
+      // -----------------------------------------------------------
+      // CLICKABLE URL
+      // -----------------------------------------------------------
+
       spans.add(
         TextSpan(
-          text: url,
-          style: linkStyle,
+          text: cleanUrl,
+
+          style: linkStyle.copyWith(
+            color: linkStyle.color ?? AppColor.primary,
+            fontWeight: linkStyle.fontWeight ?? FontWeight.w800,
+            decoration: TextDecoration.underline,
+            decorationColor:
+                (linkStyle.color ?? AppColor.primary).withOpacity(0.55),
+            decorationThickness: 1.2,
+          ),
+
           recognizer: TapGestureRecognizer()
-            ..onTap = () async {
-
-              /// Convert URL string into URI
-              final uri = Uri.tryParse(url);
-
-              /// If URL is invalid, do nothing
-              if (uri == null) return;
-
-              /// Launch the URL in the external browser
-              await launchUrl(
-                uri,
-                mode: LaunchMode.externalApplication,
-              );
+            ..onTap = () {
+              _openUrl(cleanUrl);
             },
         ),
       );
 
-      /// Update index after the processed URL
-      idx = m.end;
+      // -----------------------------------------------------------
+      // TRAILING PUNCTUATION
+      // -----------------------------------------------------------
+
+      if (trailingText.isNotEmpty) {
+        spans.add(
+          TextSpan(
+            text: trailingText,
+            style: style,
+          ),
+        );
+      }
+
+      currentIndex = match.end;
     }
 
-    /// Add remaining text after the final URL
-    if (idx < text.length) {
+    // =============================================================
+    // REMAINING TEXT
+    // =============================================================
+
+    if (currentIndex < text.length) {
       spans.add(
         TextSpan(
-          text: text.substring(idx),
+          text: text.substring(currentIndex),
           style: style,
         ),
       );
     }
 
-    /// Render the final formatted text with clickable links
-    return RichText(
-      text: TextSpan(children: spans),
+    // =============================================================
+    // FINAL TEXT
+    // =============================================================
+
+    return Text.rich(
+      TextSpan(
+        style: style,
+        children: spans,
+      ),
+
       maxLines: maxLines,
-      overflow: TextOverflow.ellipsis,
+
+      overflow:
+          maxLines != null ? TextOverflow.ellipsis : TextOverflow.visible,
+
+      textAlign: TextAlign.start,
+
+      textScaler: MediaQuery.textScalerOf(context),
     );
   }
 }

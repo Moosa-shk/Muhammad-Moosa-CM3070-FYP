@@ -1,4 +1,5 @@
 // lib/screens/quiz/quiz_screen.dart
+
 import 'package:disaster_app_ui/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:disaster_app_ui/config/colors.dart';
 import 'package:disaster_app_ui/services/quiz_progress_service.dart';
+
 import 'categories_detail_screen.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -37,12 +39,19 @@ class _QuizScreenState extends State<QuizScreen>
   void initState() {
     super.initState();
 
+    // =============================================================
+    // QUESTION VALIDATION
+    // ORIGINAL LOGIC PRESERVED
+    // =============================================================
+
     _playableQuestions = widget.questions
-        .where((q) =>
-            q['question'] != null &&
-            q['options'] is List &&
-            (q['options'] as List).isNotEmpty &&
-            q['answer'] != null)
+        .where(
+          (q) =>
+              q['question'] != null &&
+              q['options'] is List &&
+              (q['options'] as List).isNotEmpty &&
+              q['answer'] != null,
+        )
         .toList();
 
     if (_playableQuestions.isEmpty) {
@@ -53,13 +62,16 @@ class _QuizScreenState extends State<QuizScreen>
           backgroundColor: AppColor.danger,
           colorText: Colors.white,
         );
+
         Get.back();
       });
     }
 
     _unlockController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(
+        milliseconds: 520,
+      ),
     );
 
     _scaleAnim = CurvedAnimation(
@@ -74,26 +86,40 @@ class _QuizScreenState extends State<QuizScreen>
     super.dispose();
   }
 
+  // ===============================================================
+  // ANSWER LOGIC
+  // EXACT BACKEND / PROGRESS LOGIC PRESERVED
+  // ===============================================================
+
   Future<void> _onAnswerTap(int index) async {
     if (answered) return;
 
     final q = _playableQuestions[currentIndex];
+
     final questionId = q['id'].toString();
-    final options = List<String>.from(q['options']);
+
+    final options = List<String>.from(
+      q['options'],
+    );
+
     final selected = options[index];
     final correct = q['answer'].toString();
 
     final isCorrect =
-        selected.trim().toLowerCase() == correct.trim().toLowerCase();
+        selected.trim().toLowerCase() ==
+        correct.trim().toLowerCase();
 
     setState(() {
       selectedIndex = index;
       answered = true;
     });
 
-    final xp = isCorrect ? (q['xp'] ?? 10) as int : 0;
+    final xp = isCorrect
+        ? (q['xp'] ?? 10) as int
+        : 0;
 
-    final rewarded = await QuizProgressService.saveAttempt(
+    final rewarded =
+        await QuizProgressService.saveAttempt(
       questionId: questionId,
       category: widget.category,
       isCorrect: isCorrect,
@@ -103,240 +129,386 @@ class _QuizScreenState extends State<QuizScreen>
     );
 
     if (rewarded && isCorrect) {
-      final box = Hive.box<String>('kitBox');
+      final box = Hive.box<String>(
+        'kitBox',
+      );
+
       if (!box.values.contains(questionId)) {
         box.add(questionId);
+
         _showKitUnlockedAnimation();
       }
     }
   }
 
+  // ===============================================================
+  // NEXT QUESTION
+  // ORIGINAL FLOW PRESERVED
+  // ===============================================================
+
   void _next() {
     if (!answered) return;
 
-    if (currentIndex < _playableQuestions.length - 1) {
+    if (currentIndex <
+        _playableQuestions.length - 1) {
       setState(() {
         currentIndex++;
         selectedIndex = null;
         answered = false;
       });
     } else {
-      Get.off(() => CategoriesDetailScreen(category: widget.category));
+      Get.off(
+        () => CategoriesDetailScreen(
+          category: widget.category,
+        ),
+      );
     }
   }
 
+  // ===============================================================
+  // BUILD
+  // ===============================================================
+
   @override
   Widget build(BuildContext context) {
-    if (_playableQuestions.isEmpty) return const SizedBox();
+    if (_playableQuestions.isEmpty) {
+      return const SizedBox();
+    }
 
-    final q = _playableQuestions[currentIndex];
-    final options = List<String>.from(q['options']);
-    final correct = q['answer'].toString();
-    final xp = (q['xp'] ?? 10) as int;
-    final difficulty = (q['difficulty'] ?? '').toString().trim();
+    final q =
+        _playableQuestions[currentIndex];
+
+    final options =
+        List<String>.from(
+      q['options'],
+    );
+
+    final correct =
+        q['answer'].toString();
+
+    final xp =
+        (q['xp'] ?? 10) as int;
+
+    final difficulty =
+        (q['difficulty'] ?? '')
+            .toString()
+            .trim();
+
+    final questionProgress =
+        (currentIndex + 1) /
+            _playableQuestions.length;
+
+    final selectedIsCorrect =
+        selectedIndex != null &&
+        options[selectedIndex!]
+                .trim()
+                .toLowerCase() ==
+            correct
+                .trim()
+                .toLowerCase();
 
     return AppScaffold(
-      title: widget.category.toUpperCase(),
-      subtitle: "Answer to earn XP",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: false,
 
-      // ✅ FIX: give AppScaffold normal padding so title/subtitle align
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+      ),
 
       child: Stack(
         children: [
-          // ✅ FIX: remove 24 here because AppScaffold already padded
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, 16, 0, 128),
+            padding: const EdgeInsets.only(
+              bottom: 92,
+            ),
+
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
-                TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 420),
-                  tween: Tween(begin: 0, end: 1),
-                  curve: Curves.easeOut,
-                  builder: (_, v, child) => Opacity(
-                    opacity: v,
-                    child: Transform.translate(
-                      offset: Offset(0, 12 * (1 - v)),
-                      child: child,
+                // =================================================
+                // PAGE HEADER
+                // =================================================
+
+                _quizHeader(
+                  difficulty: difficulty,
+                  xp: xp,
+                ),
+
+                const SizedBox(
+                  height: 20,
+                ),
+
+                // =================================================
+                // QUESTION PROGRESS
+                // =================================================
+
+                _questionProgress(
+                  progress: questionProgress,
+                ),
+
+                const SizedBox(
+                  height: 18,
+                ),
+
+                // =================================================
+                // QUESTION STAGE
+                // =================================================
+
+                _questionStage(
+                  question:
+                      q['question'].toString(),
+                ),
+
+                const SizedBox(
+                  height: 18,
+                ),
+
+                // =================================================
+                // ANSWER LABEL
+                // =================================================
+
+                Row(
+                  children: [
+                    const Text(
+                      "Choose an answer",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            FontWeight.w900,
+                        color:
+                            AppColor.text,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
+
+                    const Spacer(),
+
+                    if (!answered)
                       Text(
-                        "QUESTION ${currentIndex + 1} / ${_playableQuestions.length}",
+                        "${options.length} choices",
                         style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                          letterSpacing: 1.2,
-                          color: AppColor.textMuted,
+                          fontSize: 11,
+                          fontWeight:
+                              FontWeight.w600,
+                          color:
+                              AppColor.textMuted,
                         ),
                       ),
-                      const Spacer(),
-                      _pill("XP $xp", icon: Icons.bolt_rounded),
-                      if (difficulty.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        _pill(_prettyDifficulty(difficulty),
-                            icon: Icons.speed_rounded),
-                      ],
-                    ],
+                  ],
+                ),
+
+                const SizedBox(
+                  height: 11,
+                ),
+
+                // =================================================
+                // ANSWERS
+                // =================================================
+
+                Expanded(
+                  child: ListView.builder(
+                    padding:
+                        const EdgeInsets.only(
+                      bottom: 10,
+                    ),
+
+                    physics:
+                        const BouncingScrollPhysics(),
+
+                    itemCount:
+                        options.length,
+
+                    itemBuilder:
+                        (_, index) {
+                      final state =
+                          _optionState(
+                        answered:
+                            answered,
+                        selectedIndex:
+                            selectedIndex,
+                        i:
+                            index,
+                        optionText:
+                            options[index],
+                        correct:
+                            correct,
+                      );
+
+                      return TweenAnimationBuilder<
+                          double>(
+                        duration: Duration(
+                          milliseconds:
+                              260 +
+                                  (index *
+                                      70),
+                        ),
+
+                        tween:
+                            Tween(
+                          begin: 0,
+                          end: 1,
+                        ),
+
+                        curve:
+                            Curves.easeOutCubic,
+
+                        builder:
+                            (_, value, child) {
+                          return Opacity(
+                            opacity:
+                                value,
+
+                            child:
+                                Transform.translate(
+                              offset:
+                                  Offset(
+                                18 *
+                                    (1 -
+                                        value),
+                                0,
+                              ),
+
+                              child:
+                                  child,
+                            ),
+                          );
+                        },
+
+                        child:
+                            _answerTile(
+                          index:
+                              index,
+                          text:
+                              options[index],
+                          state:
+                              state,
+                          onTap:
+                              () =>
+                                  _onAnswerTap(
+                            index,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
 
-                const SizedBox(height: 14),
+                // =================================================
+                // ANSWER FEEDBACK
+                // =================================================
 
-                TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 520),
-                  tween: Tween(begin: 0, end: 1),
-                  curve: Curves.easeOutCubic,
-                  builder: (_, v, child) => Opacity(
-                    opacity: v,
-                    child: Transform.translate(
-                      offset: Offset(0, 18 * (1 - v)),
-                      child: child,
-                    ),
+                if (answered) ...[
+                  const SizedBox(
+                    height: 6,
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    decoration: BoxDecoration(
-                      color: AppColor.cardFill,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColor.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.07),
-                          blurRadius: 18,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      q['question'],
-                      style: const TextStyle(
-                        fontSize: 19,
-                        height: 1.45,
-                        fontWeight: FontWeight.w900,
-                        color: AppColor.text,
-                      ),
-                    ),
+
+                  _answerFeedback(
+                    correct:
+                        selectedIsCorrect,
+                    xp:
+                        xp,
                   ),
-                ),
-
-                const SizedBox(height: 18),
-
-                ...List.generate(options.length, (i) {
-                  final state = _optionState(
-                    answered: answered,
-                    selectedIndex: selectedIndex,
-                    i: i,
-                    optionText: options[i],
-                    correct: correct,
-                  );
-
-                  final bg = _optionBg(state);
-                  final border = _optionBorder(state);
-                  final textColor = _optionTextColor(state);
-                  final icon = _optionIcon(state);
-                  final iconColor = _optionIconColor(state);
-
-                  return TweenAnimationBuilder<double>(
-                    duration: Duration(milliseconds: 280 + (i * 90)),
-                    tween: Tween(begin: 0, end: 1),
-                    curve: Curves.easeOut,
-                    builder: (_, v, child) => Opacity(
-                      opacity: v,
-                      child: Transform.translate(
-                        offset: Offset(0, 12 * (1 - v)),
-                        child: child,
-                      ),
-                    ),
-                    child: GestureDetector(
-                      onTap: () => _onAnswerTap(i),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: bg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 14,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: iconColor.withOpacity(0.12),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: iconColor.withOpacity(0.18),
-                                ),
-                              ),
-                              child: Icon(icon, color: iconColor, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                options[i],
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                  height: 1.25,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+                ],
               ],
             ),
           ),
 
-          // ✅ FIX: button aligned with same padding (no 24 because scaffold padded)
+          // =======================================================
+          // FIXED CONTINUE BUTTON
+          // =======================================================
+
           Positioned(
-            bottom: 26,
             left: 0,
             right: 0,
+            bottom: 20,
+
             child: SizedBox(
-              height: 56,
+              height: 58,
+
               child: ElevatedButton(
-                onPressed: answered ? _next : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.primary,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  elevation: answered ? 10 : 0,
-                  shadowColor: AppColor.primary.withOpacity(0.30),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                onPressed:
+                    answered
+                        ? _next
+                        : null,
+
+                style:
+                    ElevatedButton.styleFrom(
+                  backgroundColor:
+                      AppColor.secondary,
+
+                  disabledBackgroundColor:
+                      AppColor
+                          .inputFill,
+
+                  elevation:
+                      answered
+                          ? 7
+                          : 0,
+
+                  shadowColor:
+                      AppColor.secondary
+                          .withOpacity(
+                    0.18,
+                  ),
+
+                  shape:
+                      RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      18,
+                    ),
                   ),
                 ),
-                child: Text(
-                  currentIndex == _playableQuestions.length - 1
-                      ? "FINISH"
-                      : "NEXT",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.1,
-                    color: answered ? Colors.white : Colors.grey.shade700,
-                    fontSize: 15,
-                  ),
+
+                child: Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      currentIndex ==
+                              _playableQuestions
+                                      .length -
+                                  1
+                          ? "FINISH QUIZ"
+                          : "CONTINUE",
+
+                      style: TextStyle(
+                        fontSize: 14,
+                        letterSpacing:
+                            0.7,
+                        fontWeight:
+                            FontWeight.w900,
+                        color: answered
+                            ? Colors.white
+                            : AppColor
+                                .textMuted,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      width: 8,
+                    ),
+
+                    Icon(
+                      currentIndex ==
+                              _playableQuestions
+                                      .length -
+                                  1
+                          ? Icons
+                              .flag_outlined
+                          : Icons
+                              .arrow_forward_rounded,
+
+                      size: 20,
+
+                      color: answered
+                          ? Colors.white
+                          : AppColor
+                              .textMuted,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -346,27 +518,173 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  // ===== helpers (unchanged) =====
+  // ===============================================================
+  // QUIZ HEADER
+  // ===============================================================
 
-  Widget _pill(String text, {required IconData icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColor.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  Widget _quizHeader({
+    required String difficulty,
+    required int xp,
+  }) {
+    return SizedBox(
+      width:
+          double.infinity,
+
+      child:
+          Column(
         children: [
-          Icon(icon, size: 16, color: AppColor.primary),
-          const SizedBox(width: 6),
+          Text(
+            widget.category
+                .toUpperCase(),
+
+            textAlign:
+                TextAlign.center,
+
+            style:
+                const TextStyle(
+              fontSize:
+                  24,
+              fontWeight:
+                  FontWeight.w900,
+              color:
+                  AppColor.text,
+              letterSpacing:
+                  -0.3,
+            ),
+          ),
+
+          const SizedBox(
+            height:
+                6,
+          ),
+
+          const Text(
+            "Answer to earn XP",
+
+            textAlign:
+                TextAlign.center,
+
+            style:
+                TextStyle(
+              fontSize:
+                  12.5,
+              fontWeight:
+                  FontWeight.w600,
+              color:
+                  AppColor.textMuted,
+            ),
+          ),
+
+          const SizedBox(
+            height:
+                12,
+          ),
+
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+
+            children: [
+              _headerTag(
+                icon:
+                    Icons.bolt_rounded,
+                text:
+                    "$xp XP",
+                color:
+                    AppColor.warning,
+              ),
+
+              if (difficulty
+                  .isNotEmpty) ...[
+                const SizedBox(
+                  width:
+                      8,
+                ),
+
+                _headerTag(
+                  icon:
+                      Icons
+                          .tune_rounded,
+                  text:
+                      _prettyDifficulty(
+                    difficulty,
+                  ),
+                  color:
+                      AppColor.info,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerTag({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal:
+            11,
+        vertical:
+            7,
+      ),
+
+      decoration:
+          BoxDecoration(
+        color:
+            color.withOpacity(
+          0.09,
+        ),
+
+        borderRadius:
+            BorderRadius.circular(
+          999,
+        ),
+
+        border:
+            Border.all(
+          color:
+              color.withOpacity(
+            0.13,
+          ),
+        ),
+      ),
+
+      child:
+          Row(
+        mainAxisSize:
+            MainAxisSize.min,
+
+        children: [
+          Icon(
+            icon,
+            size:
+                15,
+            color:
+                color,
+          ),
+
+          const SizedBox(
+            width:
+                5,
+          ),
+
           Text(
             text,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-              color: AppColor.secondary,
+
+            style:
+                TextStyle(
+              fontSize:
+                  11,
+              fontWeight:
+                  FontWeight.w800,
+              color:
+                  color,
             ),
           ),
         ],
@@ -374,13 +692,621 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
+  // ===============================================================
+  // QUESTION PROGRESS
+  // ===============================================================
+
+  Widget _questionProgress({
+    required double progress,
+  }) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Text(
+              "QUESTION ${currentIndex + 1}",
+
+              style:
+                  const TextStyle(
+                fontSize:
+                    11,
+                fontWeight:
+                    FontWeight.w900,
+                color:
+                    AppColor.textMuted,
+                letterSpacing:
+                    1,
+              ),
+            ),
+
+            const Spacer(),
+
+            Text(
+              "${currentIndex + 1} / ${_playableQuestions.length}",
+
+              style:
+                  const TextStyle(
+                fontSize:
+                    11,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    AppColor.textMuted,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(
+          height:
+              8,
+        ),
+
+        ClipRRect(
+          borderRadius:
+              BorderRadius.circular(
+            999,
+          ),
+
+          child:
+              LinearProgressIndicator(
+            value:
+                progress,
+
+            minHeight:
+                7,
+
+            backgroundColor:
+                AppColor.inputFill,
+
+            color:
+                AppColor.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===============================================================
+  // QUESTION STAGE
+  // ===============================================================
+
+  Widget _questionStage({
+    required String question,
+  }) {
+    return TweenAnimationBuilder<
+        double>(
+      duration:
+          const Duration(
+        milliseconds:
+            420,
+      ),
+
+      tween:
+          Tween(
+        begin:
+            0,
+        end:
+            1,
+      ),
+
+      curve:
+          Curves.easeOutCubic,
+
+      builder:
+          (_, value, child) {
+        return Opacity(
+          opacity:
+              value,
+
+          child:
+              Transform.scale(
+            scale:
+                0.97 +
+                    (0.03 *
+                        value),
+
+            alignment:
+                Alignment.topCenter,
+
+            child:
+                child,
+          ),
+        );
+      },
+
+      child:
+          Container(
+        width:
+            double.infinity,
+
+        padding:
+            const EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          22,
+        ),
+
+        decoration:
+            BoxDecoration(
+          color:
+              AppColor.secondary,
+
+          borderRadius:
+              BorderRadius.circular(
+            24,
+          ),
+
+          boxShadow: [
+            BoxShadow(
+              color: AppColor
+                  .secondary
+                  .withOpacity(
+                0.16,
+              ),
+
+              blurRadius:
+                  20,
+
+              offset:
+                  const Offset(
+                0,
+                10,
+              ),
+            ),
+          ],
+        ),
+
+        child:
+            Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+            Container(
+              width:
+                  42,
+              height:
+                  42,
+
+              decoration:
+                  BoxDecoration(
+                color:
+                    Colors.white
+                        .withOpacity(
+                  0.10,
+                ),
+
+                borderRadius:
+                    BorderRadius.circular(
+                  13,
+                ),
+              ),
+
+              child:
+                  const Icon(
+                Icons
+                    .help_outline_rounded,
+                color:
+                    Colors.white,
+                size:
+                    21,
+              ),
+            ),
+
+            const SizedBox(
+              height:
+                  17,
+            ),
+
+            Text(
+              question,
+
+              style:
+                  const TextStyle(
+                fontSize:
+                    19,
+                height:
+                    1.42,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // ANSWER TILE
+  // ===============================================================
+
+  Widget _answerTile({
+    required int index,
+    required String text,
+    required _OptState state,
+    required VoidCallback onTap,
+  }) {
+    final background =
+        _optionBg(state);
+
+    final border =
+        _optionBorder(state);
+
+    final textColor =
+        _optionTextColor(state);
+
+    final accent =
+        _optionIconColor(state);
+
+    final trailingIcon =
+        _optionIcon(state);
+
+    final letter =
+        String.fromCharCode(
+      65 + index,
+    );
+
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        bottom:
+            11,
+      ),
+
+      child:
+          Material(
+        color:
+            Colors.transparent,
+
+        child:
+            InkWell(
+          onTap:
+              answered
+                  ? null
+                  : onTap,
+
+          borderRadius:
+              BorderRadius.circular(
+            17,
+          ),
+
+          child:
+              AnimatedContainer(
+            duration:
+                const Duration(
+              milliseconds:
+                  220,
+            ),
+
+            width:
+                double.infinity,
+
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal:
+                  13,
+              vertical:
+                  13,
+            ),
+
+            decoration:
+                BoxDecoration(
+              color:
+                  background,
+
+              borderRadius:
+                  BorderRadius.circular(
+                17,
+              ),
+
+              border:
+                  Border.all(
+                color:
+                    border,
+              ),
+
+              boxShadow: state ==
+                          _OptState.correct ||
+                      state ==
+                          _OptState.wrong
+                  ? [
+                      BoxShadow(
+                        color: accent
+                            .withOpacity(
+                          0.10,
+                        ),
+                        blurRadius:
+                            14,
+                        offset:
+                            const Offset(
+                          0,
+                          7,
+                        ),
+                      ),
+                    ]
+                  : [],
+            ),
+
+            child:
+                Row(
+              children: [
+                AnimatedContainer(
+                  duration:
+                      const Duration(
+                    milliseconds:
+                        220,
+                  ),
+
+                  width:
+                      40,
+                  height:
+                      40,
+
+                  alignment:
+                      Alignment.center,
+
+                  decoration:
+                      BoxDecoration(
+                    color: accent
+                        .withOpacity(
+                      state ==
+                              _OptState
+                                  .idle
+                          ? 0.07
+                          : 0.12,
+                    ),
+
+                    borderRadius:
+                        BorderRadius.circular(
+                      12,
+                    ),
+
+                    border:
+                        Border.all(
+                      color: accent
+                          .withOpacity(
+                        0.14,
+                      ),
+                    ),
+                  ),
+
+                  child:
+                      Text(
+                    letter,
+
+                    style:
+                        TextStyle(
+                      fontSize:
+                          13,
+                      fontWeight:
+                          FontWeight.w900,
+                      color:
+                          accent,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(
+                  width:
+                      13,
+                ),
+
+                Expanded(
+                  child:
+                      Text(
+                    text,
+
+                    style:
+                        TextStyle(
+                      color:
+                          textColor,
+
+                      fontWeight:
+                          FontWeight.w700,
+
+                      fontSize:
+                          14,
+
+                      height:
+                          1.3,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(
+                  width:
+                      10,
+                ),
+
+                Icon(
+                  trailingIcon,
+                  color:
+                      accent,
+                  size:
+                      21,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // ANSWER FEEDBACK
+  // ===============================================================
+
+  Widget _answerFeedback({
+    required bool correct,
+    required int xp,
+  }) {
+    final color =
+        correct
+            ? AppColor.safeGreen
+            : AppColor.danger;
+
+    return AnimatedContainer(
+      duration:
+          const Duration(
+        milliseconds:
+            220,
+      ),
+
+      width:
+          double.infinity,
+
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal:
+            14,
+        vertical:
+            12,
+      ),
+
+      decoration:
+          BoxDecoration(
+        color:
+            color.withOpacity(
+          0.08,
+        ),
+
+        borderRadius:
+            BorderRadius.circular(
+          15,
+        ),
+
+        border:
+            Border.all(
+          color:
+              color.withOpacity(
+            0.14,
+          ),
+        ),
+      ),
+
+      child:
+          Row(
+        children: [
+          Container(
+            width:
+                34,
+            height:
+                34,
+
+            decoration:
+                BoxDecoration(
+              color:
+                  color.withOpacity(
+                0.12,
+              ),
+
+              shape:
+                  BoxShape.circle,
+            ),
+
+            child:
+                Icon(
+              correct
+                  ? Icons.check_rounded
+                  : Icons.close_rounded,
+
+              color:
+                  color,
+
+              size:
+                  19,
+            ),
+          ),
+
+          const SizedBox(
+            width:
+                11,
+          ),
+
+          Expanded(
+            child:
+                Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+
+              children: [
+                Text(
+                  correct
+                      ? "Correct"
+                      : "Not quite",
+
+                  style:
+                      TextStyle(
+                    fontSize:
+                        13,
+                    fontWeight:
+                        FontWeight.w900,
+                    color:
+                        color,
+                  ),
+                ),
+
+                const SizedBox(
+                  height:
+                      2,
+                ),
+
+                Text(
+                  correct
+                      ? "+$xp XP earned"
+                      : "The correct answer is highlighted.",
+
+                  style:
+                      const TextStyle(
+                    fontSize:
+                        11,
+                    fontWeight:
+                        FontWeight.w600,
+                    color:
+                        AppColor.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // DIFFICULTY
+  // ORIGINAL INTERPRETATION PRESERVED
+  // ===============================================================
+
   String _prettyDifficulty(String d) {
     final t = d.toLowerCase();
-    if (t.contains('easy')) return "Easy";
-    if (t.contains('medium')) return "Medium";
-    if (t.contains('hard')) return "Hard";
+
+    if (t.contains('easy')) {
+      return "Easy";
+    }
+
+    if (t.contains('medium')) {
+      return "Medium";
+    }
+
+    if (t.contains('hard')) {
+      return "Hard";
+    }
+
     return d;
   }
+
+  // ===============================================================
+  // OPTION STATE
+  // ORIGINAL LOGIC PRESERVED
+  // ===============================================================
 
   _OptState _optionState({
     required bool answered,
@@ -390,133 +1316,307 @@ class _QuizScreenState extends State<QuizScreen>
     required String correct,
   }) {
     if (!answered) {
-      if (selectedIndex == i) return _OptState.selected;
+      if (selectedIndex == i) {
+        return _OptState.selected;
+      }
+
       return _OptState.idle;
     }
 
-    final isCorrect = optionText.trim().toLowerCase() ==
+    final isCorrect =
+        optionText.trim().toLowerCase() ==
         correct.trim().toLowerCase();
 
-    if (isCorrect) return _OptState.correct;
-    if (selectedIndex == i) return _OptState.wrong;
+    if (isCorrect) {
+      return _OptState.correct;
+    }
+
+    if (selectedIndex == i) {
+      return _OptState.wrong;
+    }
+
     return _OptState.disabled;
   }
 
-  Color _optionBg(_OptState s) {
-    switch (s) {
+  // ===============================================================
+  // OPTION COLORS
+  // UI ONLY
+  // ===============================================================
+
+  Color _optionBg(_OptState state) {
+    switch (state) {
       case _OptState.correct:
-        return AppColor.safeGreen.withOpacity(0.14);
+        return AppColor.safeGreen
+            .withOpacity(0.08);
+
       case _OptState.wrong:
-        return AppColor.danger.withOpacity(0.12);
+        return AppColor.danger
+            .withOpacity(0.07);
+
       case _OptState.selected:
-        return AppColor.primary.withOpacity(0.12);
+        return AppColor.primary
+            .withOpacity(0.08);
+
       case _OptState.disabled:
-        return Colors.white.withOpacity(0.55);
+        return AppColor.surface
+            .withOpacity(0.58);
+
       case _OptState.idle:
-      default:
-        return Colors.white.withOpacity(0.92);
+        return AppColor.surface;
     }
   }
 
-  Color _optionBorder(_OptState s) {
-    switch (s) {
+  Color _optionBorder(
+    _OptState state,
+  ) {
+    switch (state) {
       case _OptState.correct:
-        return AppColor.safeGreen.withOpacity(0.35);
+        return AppColor.safeGreen
+            .withOpacity(0.32);
+
       case _OptState.wrong:
-        return AppColor.danger.withOpacity(0.30);
+        return AppColor.danger
+            .withOpacity(0.28);
+
       case _OptState.selected:
-        return AppColor.primary.withOpacity(0.35);
+        return AppColor.primary
+            .withOpacity(0.30);
+
       case _OptState.disabled:
         return AppColor.border;
+
       case _OptState.idle:
-      default:
         return AppColor.border;
     }
   }
 
-  Color _optionTextColor(_OptState s) {
-    switch (s) {
+  Color _optionTextColor(
+    _OptState state,
+  ) {
+    switch (state) {
       case _OptState.correct:
-        return AppColor.safeGreen;
+        return AppColor.text;
+
       case _OptState.wrong:
-        return AppColor.danger;
+        return AppColor.text;
+
       case _OptState.selected:
-        return AppColor.secondary;
+        return AppColor.text;
+
       case _OptState.disabled:
-        return AppColor.textMuted.withOpacity(0.85);
+        return AppColor.textMuted
+            .withOpacity(0.70);
+
       case _OptState.idle:
-      default:
         return AppColor.text;
     }
   }
 
-  IconData _optionIcon(_OptState s) {
-    switch (s) {
+  IconData _optionIcon(
+    _OptState state,
+  ) {
+    switch (state) {
       case _OptState.correct:
-        return Icons.check_rounded;
+        return Icons
+            .check_circle_rounded;
+
       case _OptState.wrong:
-        return Icons.close_rounded;
+        return Icons
+            .cancel_rounded;
+
       case _OptState.selected:
-        return Icons.radio_button_checked_rounded;
+        return Icons
+            .radio_button_checked_rounded;
+
       case _OptState.disabled:
+        return Icons
+            .radio_button_unchecked_rounded;
+
       case _OptState.idle:
-      default:
-        return Icons.circle_outlined;
+        return Icons
+            .radio_button_unchecked_rounded;
     }
   }
 
-  Color _optionIconColor(_OptState s) {
-    switch (s) {
+  Color _optionIconColor(
+    _OptState state,
+  ) {
+    switch (state) {
       case _OptState.correct:
         return AppColor.safeGreen;
+
       case _OptState.wrong:
         return AppColor.danger;
+
       case _OptState.selected:
         return AppColor.primary;
+
       case _OptState.disabled:
+        return AppColor.textMuted
+            .withOpacity(0.50);
+
       case _OptState.idle:
-      default:
         return AppColor.textMuted;
     }
   }
 
-  void _showKitUnlockedAnimation() {
-    _unlockController.forward(from: 0);
+  // ===============================================================
+  // KIT UNLOCK ANIMATION
+  // TRIGGER LOGIC PRESERVED — VISUAL CHANGED ONLY
+  // ===============================================================
 
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (_) => Center(
-        child: ScaleTransition(
-          scale: _scaleAnim,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColor.surface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColor.border),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 26,
-                  color: Colors.black.withOpacity(0.22),
+  void _showKitUnlockedAnimation() {
+    _unlockController.forward(
+      from: 0,
+    );
+
+    final overlay =
+        Overlay.of(context);
+
+    final entry =
+        OverlayEntry(
+      builder:
+          (_) => Center(
+        child:
+            ScaleTransition(
+          scale:
+              _scaleAnim,
+
+          child:
+              Material(
+            color:
+                Colors.transparent,
+
+            child:
+                Container(
+              width:
+                  220,
+
+              padding:
+                  const EdgeInsets.fromLTRB(
+                22,
+                24,
+                22,
+                22,
+              ),
+
+              decoration:
+                  BoxDecoration(
+                color:
+                    AppColor.secondary,
+
+                borderRadius:
+                    BorderRadius.circular(
+                  24,
                 ),
-              ],
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.inventory_2_rounded,
-                    size: 54, color: AppColor.primary),
-                SizedBox(height: 12),
-                Text(
-                  "PROGRESS UPDATED",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                    letterSpacing: 1.2,
-                    color: AppColor.text,
+
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius:
+                        30,
+                    color:
+                        Colors.black
+                            .withOpacity(
+                      0.22,
+                    ),
+                    offset:
+                        const Offset(
+                      0,
+                      14,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+
+              child:
+                  Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+
+                children: [
+                  Container(
+                    width:
+                        62,
+                    height:
+                        62,
+
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          Colors.white
+                              .withOpacity(
+                        0.10,
+                      ),
+
+                      borderRadius:
+                          BorderRadius.circular(
+                        19,
+                      ),
+                    ),
+
+                    child:
+                        const Icon(
+                      Icons
+                          .backpack_outlined,
+                      size:
+                          31,
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height:
+                        15,
+                  ),
+
+                  const Text(
+                    "KIT UPDATED",
+
+                    style:
+                        TextStyle(
+                      fontWeight:
+                          FontWeight.w900,
+
+                      fontSize:
+                          14,
+
+                      letterSpacing:
+                          1,
+
+                      color:
+                          Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height:
+                        5,
+                  ),
+
+                  Text(
+                    "New safety progress saved",
+
+                    textAlign:
+                        TextAlign.center,
+
+                    style:
+                        TextStyle(
+                      fontWeight:
+                          FontWeight.w600,
+
+                      fontSize:
+                          11,
+
+                      color:
+                          Colors.white
+                              .withOpacity(
+                        0.68,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -524,8 +1624,20 @@ class _QuizScreenState extends State<QuizScreen>
     );
 
     overlay.insert(entry);
-    Future.delayed(const Duration(seconds: 1), entry.remove);
+
+    Future.delayed(
+      const Duration(
+        seconds: 1,
+      ),
+      entry.remove,
+    );
   }
 }
 
-enum _OptState { idle, selected, correct, wrong, disabled }
+enum _OptState {
+  idle,
+  selected,
+  correct,
+  wrong,
+  disabled,
+}

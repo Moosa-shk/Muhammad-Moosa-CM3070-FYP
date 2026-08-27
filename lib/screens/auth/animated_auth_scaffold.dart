@@ -1,13 +1,12 @@
+// lib/screens/auth/animated_auth_scaffold.dart
+
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
 import 'package:disaster_app_ui/config/colors.dart';
 import 'package:disaster_app_ui/screens/auth/auth_ui.dart';
 
-
-/// Scaffold used for authentication screens.
-/// Provides animated background, header layout and optional scrolling.
 class AnimatedAuthScaffold extends StatefulWidget {
   const AnimatedAuthScaffold({
     super.key,
@@ -23,76 +22,115 @@ class AnimatedAuthScaffold extends StatefulWidget {
   final Widget child;
   final String? title;
   final String? subtitle;
+
   final bool showBack;
   final VoidCallback? onBack;
+
   final EdgeInsets padding;
   final bool scroll;
 
   @override
-  State<AnimatedAuthScaffold> createState() => _AnimatedAuthScaffoldState();
+  State<AnimatedAuthScaffold> createState() =>
+      _AnimatedAuthScaffoldState();
 }
 
 class _AnimatedAuthScaffoldState extends State<AnimatedAuthScaffold>
     with TickerProviderStateMixin {
-  late final AnimationController _bgCtrl;
+  late final AnimationController _ambientCtrl;
   late final AnimationController _enterCtrl;
 
-  late final Animation<double> _enterFade;
-  late final Animation<Offset> _enterSlide;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
     super.initState();
 
-    _bgCtrl =
-        AnimationController(vsync: this, duration: const Duration(seconds: 12))
-          ..repeat(reverse: true);
+    _ambientCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat(reverse: true);
 
     _enterCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 650))
-      ..forward();
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+    )..forward();
 
-    _enterFade = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic);
+    _fade = CurvedAnimation(
+      parent: _enterCtrl,
+      curve: Curves.easeOutCubic,
+    );
 
-    _enterSlide = Tween<Offset>(
-      begin: const Offset(0, 0.05),
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.025),
       end: Offset.zero,
     ).animate(
-      CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _enterCtrl,
+        curve: Curves.easeOutCubic,
+      ),
     );
   }
 
   @override
   void dispose() {
-    _bgCtrl.dispose();
+    _ambientCtrl.dispose();
     _enterCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final bg = AppColor.bg;
-    final primary = AppColor.primary;
-
-    final body = SafeArea(
+    final content = SafeArea(
       child: Padding(
         padding: widget.padding,
-        child: SlideTransition(
-          position: _enterSlide,
-          child: FadeTransition(
-            opacity: _enterFade,
+        child: FadeTransition(
+          opacity: _fade,
+          child: SlideTransition(
+            position: _slide,
             child: DefaultTextStyle(
-              style: const TextStyle(color: AuthTokens.text),
+              style: const TextStyle(
+                color: AuthTokens.text,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.showBack) const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+
+                  // =================================================
+                  // TOP BAR
+                  // =================================================
+
                   if (widget.showBack)
-                    _BackButton(primary: primary, onBack: widget.onBack),
-                  if (widget.title != null) const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _BackButton(
+                        onBack: widget.onBack,
+                      ),
+                    ),
+
                   if (widget.title != null)
-                    _Header(title: widget.title!, subtitle: widget.subtitle),
-                  if (widget.title != null) const SizedBox(height: 18),
+                    SizedBox(
+                      height: widget.showBack ? 18 : 10,
+                    ),
+
+                  // =================================================
+                  // CENTERED AUTH HEADER
+                  // =================================================
+
+                  if (widget.title != null)
+                    _AuthHeader(
+                      title: widget.title!,
+                      subtitle: widget.subtitle,
+                    ),
+
+                  if (widget.title != null)
+                    const SizedBox(height: 26),
+
+                  // =================================================
+                  // CONTENT
+                  // =================================================
+
                   widget.child,
                 ],
               ),
@@ -103,17 +141,41 @@ class _AnimatedAuthScaffoldState extends State<AnimatedAuthScaffold>
     );
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColor.bg,
       body: Stack(
         children: [
-          AnimatedBuilder(
-            animation: _bgCtrl,
-            builder: (_, __) => _AnimatedBlobs(
-              t: _bgCtrl.value,
-              bg: bg,
-              primary: primary,
+          // =======================================================
+          // BASE BACKGROUND
+          // =======================================================
+
+          const Positioned.fill(
+            child: ColoredBox(
+              color: AppColor.bg,
             ),
           ),
+
+          // =======================================================
+          // VERY SUBTLE AMBIENT LIGHT
+          // =======================================================
+
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _ambientCtrl,
+                builder: (_, __) {
+                  return CustomPaint(
+                    painter: _AuthAmbientPainter(
+                      t: _ambientCtrl.value,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
+          // =======================================================
+          // SOFT TOP WASH
+          // =======================================================
 
           Positioned.fill(
             child: IgnorePointer(
@@ -123,8 +185,8 @@ class _AnimatedAuthScaffoldState extends State<AnimatedAuthScaffold>
                     begin: Alignment.topCenter,
                     end: Alignment.center,
                     colors: [
-                      Colors.white.withOpacity(0.82),
-                      Colors.white.withOpacity(0.28),
+                      Colors.white.withOpacity(0.92),
+                      Colors.white.withOpacity(0.52),
                       Colors.transparent,
                     ],
                   ),
@@ -133,182 +195,294 @@ class _AnimatedAuthScaffoldState extends State<AnimatedAuthScaffold>
             ),
           ),
 
+          // =======================================================
+          // CONTENT
+          // =======================================================
+
           if (widget.scroll)
             SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              child: body,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              child: content,
             )
           else
-            body,
+            content,
         ],
       ),
     );
   }
 }
 
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.primary, required this.onBack});
+// =================================================================
+// HEADER
+// =================================================================
 
-  final Color primary;
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onBack ?? () => Navigator.of(context).maybePop(),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.72),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AuthTokens.border),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              color: Colors.black.withOpacity(0.10),
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Icon(Icons.arrow_back_rounded, color: primary),
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.title, this.subtitle});
+class _AuthHeader extends StatelessWidget {
+  const _AuthHeader({
+    required this.title,
+    this.subtitle,
+  });
 
   final String title;
   final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = Theme.of(context).textTheme.headlineSmall?.copyWith(
-          fontWeight: FontWeight.w900,
-          color: AuthTokens.text,
-          letterSpacing: 0.2,
-        );
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          // -------------------------------------------------------
+          // SMALL BRAND MARK
+          // -------------------------------------------------------
 
-    final subStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AuthTokens.textMuted,
-          fontWeight: FontWeight.w600,
-        );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: titleStyle),
-        const SizedBox(height: 8),
-        Container(
-          height: 4,
-          width: 42,
-          decoration: BoxDecoration(
-            color: AppColor.primary.withOpacity(0.55),
-            borderRadius: BorderRadius.circular(99),
+          Container(
+            width: 42,
+            height: 5,
+            decoration: BoxDecoration(
+              color: AppColor.primary,
+              borderRadius: BorderRadius.circular(99),
+            ),
           ),
-        ),
-        if (subtitle != null) const SizedBox(height: 10),
-        if (subtitle != null) Text(subtitle!, style: subStyle),
-      ],
+
+          const SizedBox(height: 14),
+
+          // -------------------------------------------------------
+          // TITLE
+          // -------------------------------------------------------
+
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AuthTokens.text,
+                  fontSize: 28,
+                  height: 1.15,
+                  letterSpacing: -0.7,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+
+          if (subtitle != null) ...[
+            const SizedBox(height: 8),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+              ),
+              child: Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AuthTokens.textMuted,
+                      fontSize: 13,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _AnimatedBlobs extends StatelessWidget {
-  const _AnimatedBlobs({
-    required this.t,
-    required this.bg,
-    required this.primary,
+// =================================================================
+// BACK BUTTON
+// =================================================================
+
+class _BackButton extends StatefulWidget {
+  const _BackButton({
+    this.onBack,
   });
 
-  final double t;
-  final Color bg;
-  final Color primary;
+  final VoidCallback? onBack;
+
+  @override
+  State<_BackButton> createState() =>
+      _BackButtonState();
+}
+
+class _BackButtonState extends State<_BackButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final h = MediaQuery.of(context).size.height;
-
-    double wobble(double a, double b) =>
-        a + (b - a) * (0.5 + 0.5 * sin(t * pi));
-
-    final p1 = Offset(w * wobble(0.12, 0.30), h * wobble(0.10, 0.20));
-    final p2 = Offset(w * wobble(0.82, 0.64), h * wobble(0.24, 0.12));
-    final p3 = Offset(w * wobble(0.50, 0.72), h * wobble(0.90, 0.72));
-
-    final c2 = Color.lerp(primary, Colors.white, 0.55) ?? primary;
-
-    return Stack(
-      children: [
-        Container(color: bg),
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _BlobPainter(
-              p1: p1,
-              p2: p2,
-              p3: p3,
-              c1: primary.withOpacity(0.22),
-              c2: c2.withOpacity(0.16),
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() {
+          _pressed = true;
+        });
+      },
+      onTapCancel: () {
+        setState(() {
+          _pressed = false;
+        });
+      },
+      onTapUp: (_) {
+        setState(() {
+          _pressed = false;
+        });
+      },
+      onTap: widget.onBack ??
+          () {
+            Navigator.of(context).maybePop();
+          },
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1,
+        duration: const Duration(
+          milliseconds: 110,
+        ),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColor.border,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.shadow,
+                blurRadius: 14,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.arrow_back_rounded,
+            size: 22,
+            color: AppColor.secondary,
           ),
         ),
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-            child: Container(color: Colors.transparent),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _BlobPainter extends CustomPainter {
-  _BlobPainter({
-    required this.p1,
-    required this.p2,
-    required this.p3,
-    required this.c1,
-    required this.c2,
+// =================================================================
+// BACKGROUND PAINTER
+// =================================================================
+
+class _AuthAmbientPainter extends CustomPainter {
+  _AuthAmbientPainter({
+    required this.t,
   });
 
-  final Offset p1;
-  final Offset p2;
-  final Offset p3;
-  final Color c1;
-  final Color c2;
+  final double t;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.shortestSide;
+  void paint(
+    Canvas canvas,
+    Size size,
+  ) {
+    final short = size.shortestSide;
 
-    final paint1 = Paint()
+    double wave(
+      double start,
+      double end,
+      double phase,
+    ) {
+      final p =
+          (sin((t * pi * 2) + phase) + 1) / 2;
+
+      return start + ((end - start) * p);
+    }
+
+    // =============================================================
+    // PRIMARY LIGHT - TOP LEFT
+    // =============================================================
+
+    final primaryCenter = Offset(
+      size.width * wave(0.08, 0.22, 0),
+      size.height * wave(0.04, 0.12, 0.4),
+    );
+
+    final primaryPaint = Paint()
       ..shader = RadialGradient(
-        colors: [c1, Colors.transparent],
-      ).createShader(Rect.fromCircle(center: p1, radius: r * 0.65));
+        colors: [
+          AppColor.primary.withOpacity(0.10),
+          AppColor.primary.withOpacity(0.025),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: primaryCenter,
+          radius: short * 0.62,
+        ),
+      );
 
-    final paint2 = Paint()
+    canvas.drawCircle(
+      primaryCenter,
+      short * 0.62,
+      primaryPaint,
+    );
+
+    // =============================================================
+    // COOL LIGHT - RIGHT SIDE
+    // =============================================================
+
+    final secondaryCenter = Offset(
+      size.width * wave(0.78, 0.94, 1.3),
+      size.height * wave(0.22, 0.34, 0.7),
+    );
+
+    final secondaryPaint = Paint()
       ..shader = RadialGradient(
-        colors: [c2, Colors.transparent],
-      ).createShader(Rect.fromCircle(center: p2, radius: r * 0.70));
+        colors: [
+          AppColor.info.withOpacity(0.07),
+          AppColor.info.withOpacity(0.018),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: secondaryCenter,
+          radius: short * 0.58,
+        ),
+      );
 
-    final paint3 = Paint()
+    canvas.drawCircle(
+      secondaryCenter,
+      short * 0.58,
+      secondaryPaint,
+    );
+
+    // =============================================================
+    // BOTTOM BALANCE LIGHT
+    // =============================================================
+
+    final bottomCenter = Offset(
+      size.width * 0.48,
+      size.height * wave(0.80, 0.92, 2.0),
+    );
+
+    final bottomPaint = Paint()
       ..shader = RadialGradient(
-        colors: [c1.withOpacity(0.12), Colors.transparent],
-      ).createShader(Rect.fromCircle(center: p3, radius: r * 0.85));
+        colors: [
+          AppColor.safeGreen.withOpacity(0.045),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: bottomCenter,
+          radius: short * 0.72,
+        ),
+      );
 
-    canvas.drawRect(Offset.zero & size, paint3);
-    canvas.drawRect(Offset.zero & size, paint2);
-    canvas.drawRect(Offset.zero & size, paint1);
+    canvas.drawCircle(
+      bottomCenter,
+      short * 0.72,
+      bottomPaint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _BlobPainter oldDelegate) {
-    return oldDelegate.p1 != p1 ||
-        oldDelegate.p2 != p2 ||
-        oldDelegate.p3 != p3;
+  bool shouldRepaint(
+    covariant _AuthAmbientPainter oldDelegate,
+  ) {
+    return oldDelegate.t != t;
   }
 }

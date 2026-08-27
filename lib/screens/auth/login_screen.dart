@@ -1,19 +1,4 @@
-// ===============================================================
-// login_screen.dart
-// ---------------------------------------------------------------
-// This screen provides the login interface for the application.
-// Users can enter their email and password to authenticate
-// through Firebase Authentication.
-//
-// The screen uses reusable UI components defined in auth_ui.dart
-// such as:
-// • AuthGlassCard
-// • AuthField
-// • AuthPrimaryButton
-//
-// The AnimatedAuthScaffold widget provides a modern animated
-// background and layout used across authentication screens.
-// ===============================================================
+// lib/screens/auth/login_screen.dart
 
 import 'package:disaster_app_ui/screens/auth/auth_ui.dart';
 import 'package:flutter/material.dart';
@@ -35,196 +20,251 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
+  final TextEditingController email = TextEditingController();
+  final TextEditingController password = TextEditingController();
 
-  /// Controllers for email and password input fields
-  final email = TextEditingController();
-  final password = TextEditingController();
-
-  /// Indicates if login process is running
   bool loading = false;
 
-  /// Controller used to animate the logo
-  late final AnimationController _logoCtrl;
-
-  // ===============================================================
-  // initState()
-  // ---------------------------------------------------------------
-  // Initializes the logo animation which creates a subtle floating
-  // and scaling effect for better visual interaction.
-  // ===============================================================
+  late final AnimationController _entryController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    _logoCtrl = AnimationController(
+    _entryController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-  }
+      duration: const Duration(milliseconds: 500),
+    )..forward();
 
-  // ===============================================================
-  // dispose()
-  // ---------------------------------------------------------------
-  // Cleans up controllers when the widget is removed from memory
-  // to prevent memory leaks.
-  // ===============================================================
+    _fadeAnimation = CurvedAnimation(
+      parent: _entryController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.025),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
 
   @override
   void dispose() {
     email.dispose();
     password.dispose();
-    _logoCtrl.dispose();
+    _entryController.dispose();
     super.dispose();
   }
 
-  // ===============================================================
-  // LOGIN FUNCTION
-  // ---------------------------------------------------------------
-  // This method calls the AuthController to authenticate the user
-  // using the provided email and password.
-  // ===============================================================
-
   Future<void> _login() async {
+    if (loading) return;
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     final err = await AuthController.to.login(
       email.text.trim(),
       password.text.trim(),
     );
 
-    setState(() => loading = false);
+    if (!mounted) return;
 
-    // Display error if login fails
+    setState(() {
+      loading = false;
+    });
+
     if (err != null) {
-      Get.snackbar("Login Failed", err);
+      Get.snackbar(
+        "Login Failed",
+        err,
+      );
       return;
     }
 
-    // Navigate to home screen if login succeeds
-    Get.offAll(() => const HomeScreen(), transition: Transition.fadeIn);
+    Get.offAll(
+      () => const HomeScreen(),
+      transition: Transition.fadeIn,
+    );
   }
-
-  // ===============================================================
-  // UI BUILD
-  // ===============================================================
 
   @override
   Widget build(BuildContext context) {
     return AnimatedAuthScaffold(
-      title: "Welcome back",
-      subtitle: "Sign in to continue",
+      title: null,
+      subtitle: null,
       scroll: false,
-
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+      ),
       child: Expanded(
-        child: Column(
-          children: [
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 26),
 
-            const SizedBox(height: 18),
+                _brand(),
 
-            // ===============================================================
-            // LOGO ANIMATION
-            // ---------------------------------------------------------------
-            // Creates a floating animation effect for the app logo
-            // to improve the visual appearance of the login screen.
-            // ===============================================================
+                const SizedBox(height: 42),
 
-            AnimatedBuilder(
-              animation: _logoCtrl,
-              builder: (_, __) {
-
-                final t = _logoCtrl.value;
-
-                final dy = (t - 0.5) * 10;
-
-                final scale =
-                    1.0 + (0.04 * (0.5 - (t - 0.5).abs()) * 2);
-
-                return Transform.translate(
-                  offset: Offset(0, dy),
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Image.asset(
-                      "assets/images/logo.png",
-                      height: 96,
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 18),
-
-            // ===============================================================
-            // LOGIN FORM CARD
-            // ===============================================================
-
-            AuthGlassCard(
-              child: Column(
-                children: [
-
-                  /// Email input
-                  AuthField(
-                    controller: email,
-                    label: "Email",
-                    icon: Icons.email_rounded,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  /// Password input
-                  AuthField(
-                    controller: password,
-                    label: "Password",
-                    icon: Icons.lock_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-
-                    /// Allow login when user presses enter
-                    onSubmitted: (_) => loading ? null : _login(),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  /// Login button
-                  AuthPrimaryButton(
-                    title: "Login",
-                    loading: loading,
-                    onTap: loading ? null : _login,
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-
-            // ===============================================================
-            // SIGNUP NAVIGATION
-            // ---------------------------------------------------------------
-            // Redirects users to the signup screen if they do not
-            // already have an account.
-            // ===============================================================
-
-            Padding(
-              padding: const EdgeInsets.only(bottom: 18),
-              child: GestureDetector(
-                onTap: () => Get.to(
-                  () => const SignupScreen(),
-                  transition: Transition.rightToLeft,
+                const TextWidget(
+                  "Welcome back",
+                  size: 29,
+                  weight: FontWeight.w900,
+                  color: AppColor.text,
                 ),
-                child: TextWidget(
-                  "New user? Sign Up",
-                  color: AppColor.primary,
-                  size: 15,
+
+                const SizedBox(height: 8),
+
+                const TextWidget(
+                  "Sign in to your account",
+                  size: 14,
+                  weight: FontWeight.w500,
+                  color: AppColor.textMuted,
                 ),
-              ),
+
+                const SizedBox(height: 30),
+
+                const TextWidget(
+                  "Email",
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: AppColor.text,
+                ),
+
+                const SizedBox(height: 8),
+
+                AuthField(
+                  controller: email,
+                  label: "Email address",
+                  icon: Icons.alternate_email_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                ),
+
+                const SizedBox(height: 18),
+
+                const TextWidget(
+                  "Password",
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: AppColor.text,
+                ),
+
+                const SizedBox(height: 8),
+
+                AuthField(
+                  controller: password,
+                  label: "Password",
+                  icon: Icons.lock_outline_rounded,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) {
+                    if (!loading) {
+                      _login();
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 26),
+
+                AuthPrimaryButton(
+                  title: "Sign in",
+                  loading: loading,
+                  onTap: loading ? null : _login,
+                ),
+
+                const Spacer(),
+
+                _signupLink(),
+
+                const SizedBox(height: 24),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _brand() {
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColor.border,
+            ),
+          ),
+          child: Image.asset(
+            "assets/images/logo.png",
+            fit: BoxFit.contain,
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        const TextWidget(
+          "RescueAid",
+          size: 18,
+          weight: FontWeight.w900,
+          color: AppColor.text,
+        ),
+      ],
+    );
+  }
+
+  Widget _signupLink() {
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const TextWidget(
+            "Don't have an account?",
+            size: 13,
+            weight: FontWeight.w500,
+            color: AppColor.textMuted,
+          ),
+
+          const SizedBox(width: 5),
+
+          GestureDetector(
+            onTap: () {
+              Get.to(
+                () => const SignupScreen(),
+                transition: Transition.rightToLeft,
+              );
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(
+                vertical: 8,
+              ),
+              child: TextWidget(
+                "Sign up",
+                size: 13,
+                weight: FontWeight.w900,
+                color: AppColor.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

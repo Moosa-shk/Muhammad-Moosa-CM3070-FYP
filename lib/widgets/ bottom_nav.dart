@@ -1,4 +1,5 @@
-import 'dart:ui';
+// lib/widgets/ bottom_nav.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -11,17 +12,14 @@ import 'package:disaster_app_ui/screens/maps/map_screen.dart';
 import 'package:disaster_app_ui/screens/quiz/quiz_list_screen.dart';
 import 'package:disaster_app_ui/screens/settingss/settings_screen.dart';
 
-/// This widget implements the main bottom navigation bar
-/// used across the application. It allows users to quickly
-/// navigate between the main modules such as Home, Map,
-/// Alerts, Quiz, and Settings.
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
 
-  const BottomNavBar({super.key, this.currentIndex = 0});
+  const BottomNavBar({
+    super.key,
+    this.currentIndex = 0,
+  });
 
-  /// Handles navigation when a navigation item is tapped.
-  /// GetX navigation is used to replace the current screen.
   void _navigate(int index) {
     if (index == currentIndex) return;
 
@@ -29,15 +27,19 @@ class BottomNavBar extends StatelessWidget {
       case 0:
         Get.offAll(() => const HomeScreen());
         break;
+
       case 1:
         Get.offAll(() => const MapsScreen());
         break;
+
       case 2:
         Get.offAll(() => const AlertScreen());
         break;
+
       case 3:
         Get.offAll(() => const QuizListScreen());
         break;
+
       case 4:
         Get.offAll(() => const SettingsScreen());
         break;
@@ -46,82 +48,83 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    /// Icons used in the navigation bar
-    final icons = <IconData>[
-      Icons.home_rounded,
-      Icons.map_rounded,
-      Icons.notifications_rounded,
-      Icons.quiz_rounded,
-      Icons.settings_rounded,
-    ];
-
-    /// Labels shown with the icons
-    final labels = <String>["Home", "Map", "Alerts", "Quiz", "Settings"];
-
-    /// Helps adjust the navbar position for devices
-    /// that have bottom safe area padding.
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: EdgeInsets.fromLTRB(18, 0, 18, 18 + (bottomInset > 0 ? 2 : 0)),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-
-          /// Backdrop blur effect to create a glass-like appearance
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: 76,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-
-              /// Main container styling of the navbar
-              decoration: BoxDecoration(
-                color: AppColor.primary.withOpacity(0.86),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withOpacity(0.18)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 22,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColor.secondary,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.16),
+            blurRadius: 24,
+            offset: const Offset(0, -7),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          14,
+          8,
+          14,
+          bottomInset > 0 ? bottomInset + 5 : 12,
+        ),
+        child: SizedBox(
+          height: 72,
+          child: Row(
+            children: [
+              Expanded(
+                child: _SideNavItem(
+                  label: "Home",
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  active: currentIndex == 0,
+                  onTap: () => _navigate(0),
+                ),
               ),
 
-              /// LayoutBuilder helps adjust the layout
-              /// for smaller screen sizes.
-              child: LayoutBuilder(
-                builder: (context, c) {
-
-                  /// If device width is small, label text may scale down
-                  final isTight = c.maxWidth < 360;
-
-                  return Row(
-                    children: List.generate(icons.length, (index) {
-
-                      final isActive = currentIndex == index;
-
-                      /// Active tab gets more space so label can appear
-                      final flex = isActive ? 3 : 1;
-
-                      return Expanded(
-                        flex: flex,
-                        child: _NavPill(
-                          icon: icons[index],
-                          label: labels[index],
-                          active: isActive,
-                          tight: isTight,
-                          onTap: () => _navigate(index),
-                        ),
-                      );
-                    }),
-                  );
-                },
+              Expanded(
+                child: _SideNavItem(
+                  label: "Map",
+                  icon: Icons.near_me_outlined,
+                  activeIcon: Icons.near_me_rounded,
+                  active: currentIndex == 1,
+                  onTap: () => _navigate(1),
+                ),
               ),
-            ),
+
+              SizedBox(
+                width: 82,
+                child: _CenterAlertButton(
+                  active: currentIndex == 2,
+                  onTap: () => _navigate(2),
+                ),
+              ),
+
+              Expanded(
+                child: _SideNavItem(
+                  label: "Quiz",
+                  icon: Icons.extension_outlined,
+                  activeIcon: Icons.extension_rounded,
+                  active: currentIndex == 3,
+                  onTap: () => _navigate(3),
+                ),
+              ),
+
+              Expanded(
+                child: _SideNavItem(
+                  label: "Settings",
+                  icon: Icons.tune_rounded,
+                  activeIcon: Icons.tune_rounded,
+                  active: currentIndex == 4,
+                  onTap: () => _navigate(4),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -129,107 +132,260 @@ class BottomNavBar extends StatelessWidget {
   }
 }
 
-/// Individual navigation button widget
-/// used inside the BottomNavBar.
-class _NavPill extends StatelessWidget {
-  const _NavPill({
-    required this.icon,
+class _SideNavItem extends StatefulWidget {
+  const _SideNavItem({
     required this.label,
+    required this.icon,
+    required this.activeIcon,
     required this.active,
-    required this.tight,
     required this.onTap,
   });
 
-  final IconData icon;
   final String label;
+  final IconData icon;
+  final IconData activeIcon;
   final bool active;
-  final bool tight;
   final VoidCallback onTap;
 
   @override
+  State<_SideNavItem> createState() => _SideNavItemState();
+}
+
+class _SideNavItemState extends State<_SideNavItem> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
 
-      /// Animated container used to smoothly
-      /// transition between active and inactive states
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: EdgeInsets.symmetric(
-          horizontal: active ? 14 : 0,
-          vertical: 6,
-        ),
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
 
-        decoration: BoxDecoration(
-          color: active ? Colors.white.withOpacity(0.92) : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
 
-          /// Shadow applied when item is active
-          boxShadow: active
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 10),
-                  ),
-                ]
-              : const [],
-        ),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+      },
 
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+      onTap: widget.onTap,
 
-              /// Icon container
-              Container(
-                height: 44,
-                width: 44,
-                decoration: BoxDecoration(
-                  color: active
-                      ? AppColor.primary.withOpacity(0.12)
-                      : Colors.white.withOpacity(0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: active
-                      ? AppColor.primary
-                      : Colors.white.withOpacity(0.95),
-                ),
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1,
+        duration: const Duration(milliseconds: 110),
+
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+
+              transform: Matrix4.translationValues(
+                0,
+                widget.active ? -2 : 0,
+                0,
               ),
 
-              /// Label appears only for active item
-              if (active) ...[
-                const SizedBox(width: 10),
+              width: 40,
+              height: 38,
 
-                /// FittedBox ensures text scales down
-                /// instead of overflowing on small screens
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      softWrap: false,
-                      style: TextStyle(
-                        color: AppColor.primary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: tight ? 13 : 14,
-                      ),
-                    ),
+              decoration: BoxDecoration(
+                color: widget.active
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.transparent,
+
+                borderRadius: BorderRadius.circular(13),
+              ),
+
+              child: Icon(
+                widget.active
+                    ? widget.activeIcon
+                    : widget.icon,
+
+                size: widget.active ? 23 : 21,
+
+                color: widget.active
+                    ? Colors.white
+                    : Colors.white.withOpacity(0.48),
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+
+              style: TextStyle(
+                fontSize: widget.active ? 10 : 9.5,
+
+                fontWeight: widget.active
+                    ? FontWeight.w800
+                    : FontWeight.w600,
+
+                color: widget.active
+                    ? Colors.white
+                    : Colors.white.withOpacity(0.45),
+              ),
+
+              child: Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+
+              width: widget.active ? 20 : 0,
+              height: 3,
+
+              decoration: BoxDecoration(
+                color: AppColor.primary,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenterAlertButton extends StatefulWidget {
+  const _CenterAlertButton({
+    required this.active,
+    required this.onTap,
+  });
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  State<_CenterAlertButton> createState() => _CenterAlertButtonState();
+}
+
+class _CenterAlertButtonState extends State<_CenterAlertButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+
+      onTapDown: (_) {
+        setState(() => _pressed = true);
+      },
+
+      onTapCancel: () {
+        setState(() => _pressed = false);
+      },
+
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+      },
+
+      onTap: widget.onTap,
+
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1,
+        duration: const Duration(milliseconds: 110),
+
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              top: -21,
+
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+
+                width: widget.active ? 64 : 62,
+                height: widget.active ? 64 : 62,
+
+                decoration: BoxDecoration(
+                  color: widget.active
+                      ? AppColor.primary
+                      : AppColor.primary.withOpacity(0.78),
+
+                  shape: BoxShape.circle,
+
+                  border: Border.all(
+                    color: widget.active
+                        ? Colors.white.withOpacity(0.30)
+                        : Colors.white.withOpacity(0.14),
+                    width: widget.active ? 2.5 : 2,
                   ),
+
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.primary.withOpacity(
+                        widget.active ? 0.30 : 0.18,
+                      ),
+                      blurRadius: widget.active ? 22 : 16,
+                      offset: const Offset(0, 9),
+                    ),
+                  ],
                 ),
 
-                const SizedBox(width: 4),
-              ],
-            ],
-          ),
+                child: Icon(
+                  widget.active
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+
+                  color: Colors.white.withOpacity(
+                    widget.active ? 1 : 0.82,
+                  ),
+
+                  size: widget.active ? 29 : 27,
+                ),
+              ),
+            ),
+
+            Positioned(
+              bottom: 4,
+
+              child: Column(
+                children: [
+                  Text(
+                    "Alerts",
+                    style: TextStyle(
+                      fontSize: widget.active ? 10 : 9.5,
+                      fontWeight: widget.active
+                          ? FontWeight.w900
+                          : FontWeight.w600,
+                      color: widget.active
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.55),
+                    ),
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+
+                    width: widget.active ? 22 : 0,
+                    height: 3,
+
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

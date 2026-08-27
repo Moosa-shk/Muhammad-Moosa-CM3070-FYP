@@ -1,135 +1,343 @@
+// lib/services/openmap_service.dart
+
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 /// This service is used to fetch nearby emergency places
 /// using the OpenStreetMap Overpass API.
-/// It returns locations like hospitals, police stations,
-/// fire stations, or shelters near the user's location.
+///
+/// It returns locations like:
+/// - hospitals
+/// - police stations
+/// - fire stations
+/// - shelters
 class OpenMapService {
+  OpenMapService._();
 
-  /// Overpass API endpoint
-  static const _overpass = 'https://overpass-api.de/api/interpreter';
+  // ===============================================================
+  // OVERPASS ENDPOINTS
+  // ===============================================================
 
-  /// Fetch nearby places around the given coordinates.
-  /// Example types: hospital, police, fire_station, shelter.
+  /// Public Overpass servers can occasionally become overloaded.
+  /// We keep the existing server as the primary endpoint and use
+  /// another public global endpoint only when the first one fails.
+  static const List<String> _overpassEndpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ];
+
+  /// Useful for UI/debugging if every endpoint fails.
+  static String? lastError;
+
+  // ===============================================================
+  // FETCH NEARBY PLACES
+  // ===============================================================
+
   static Future<List<Map<String, dynamic>>> fetchNearbyPlaces({
     required LatLng center,
     required String type,
-    int radius = 3000,
+    int radius = 4000,
   }) async {
+    lastError = null;
 
-    /// Overpass query used to search nearby locations
-    final query = '''
+    final query = _buildQuery(
+      center: center,
+      type: type,
+      radius: radius,
+    );
+
+    Object? latestError;
+
+    // =============================================================
+    // TRY AVAILABLE OVERPASS SERVERS
+    // =============================================================
+
+    for (final endpoint in _overpassEndpoints) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse(endpoint),
+              headers: const {
+                'Content-Type':
+                    'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'User-Agent': 'RescueAid/1.0 (Flutter)',
+              },
+              body: 'data=${Uri.encodeComponent(query)}',
+            )
+            .timeout(
+              const Duration(seconds: 18),
+            );
+
+        final raw = response.body.trim();
+
+        // ---------------------------------------------------------
+        // INVALID / BUSY SERVER
+        // ---------------------------------------------------------
+
+        if (response.statusCode != 200) {
+          latestError =
+              'Overpass returned HTTP ${response.statusCode}';
+
+          continue;
+        }
+
+        if (raw.isEmpty || !raw.startsWith('{')) {
+          latestError =
+              'Overpass returned a non-JSON response';
+
+          continue;
+        }
+
+        // ---------------------------------------------------------
+        // PARSE
+        // ---------------------------------------------------------
+
+        final decoded = jsonDecode(raw);
+
+        if (decoded is! Map<String, dynamic>) {
+          latestError =
+              'Unexpected Overpass response format';
+
+          continue;
+        }
+
+        final elements =
+            (decoded['elements'] as List?) ?? const [];
+
+        final results = _parseElements(
+          elements,
+          fallbackType: type,
+        );
+
+        lastError = null;
+
+        return results;
+      } catch (e) {
+        latestError = e;
+
+        // Try next endpoint automatically.
+        continue;
+      }
+    }
+
+    lastError =
+        latestError?.toString() ??
+        'Unable to connect to map service';
+
+    return [];
+  }
+
+  // ===============================================================
+  // QUERY
+  // ===============================================================
+
+  static String _buildQuery({
+    required LatLng center,
+    required String type,
+    required int radius,
+  }) {
+    final lat = center.latitude;
+    final lon = center.longitude;
+
+    // -------------------------------------------------------------
+    // SHELTERS
+    // -------------------------------------------------------------
+    //
+    // OSM uses multiple valid tags for refuge / emergency places.
+    // Using these together gives more useful results.
+    // -------------------------------------------------------------
+
+    if (type == 'shelter') {
+      return '''
 [out:json][timeout:25];
 (
-  node["amenity"="$type"](around:$radius,${center.latitude},${center.longitude});
-  way["amenity"="$type"](around:$radius,${center.latitude},${center.longitude});
-  relation["amenity"="$type"](around:$radius,${center.latitude},${center.longitude});
+  node["amenity"="shelter"](around:$radius,$lat,$lon);
+  way["amenity"="shelter"](around:$radius,$lat,$lon);
+  relation["amenity"="shelter"](around:$radius,$lat,$lon);
+
+  node["amenity"="social_facility"]["social_facility"="shelter"](around:$radius,$lat,$lon);
+  way["amenity"="social_facility"]["social_facility"="shelter"](around:$radius,$lat,$lon);
+  relation["amenity"="social_facility"]["social_facility"="shelter"](around:$radius,$lat,$lon);
+
+  node["emergency"="assembly_point"](around:$radius,$lat,$lon);
+  way["emergency"="assembly_point"](around:$radius,$lat,$lon);
+  relation["emergency"="assembly_point"](around:$radius,$lat,$lon);
 );
 out center;
 ''';
+    }
 
-    try {
+    // -------------------------------------------------------------
+    // HOSPITAL / POLICE / FIRE
+    // -------------------------------------------------------------
 
-      /// Send request to Overpass API
-      final res = await http
-          .post(
-            Uri.parse(_overpass),
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Accept': 'application/json',
-              'User-Agent': 'DisasterAid/1.0 (Flutter)',
-            },
-            body: 'data=${Uri.encodeComponent(query)}',
-          )
-          .timeout(const Duration(seconds: 12));
+    return '''
+[out:json][timeout:25];
+(
+  node["amenity"="$type"](around:$radius,$lat,$lon);
+  way["amenity"="$type"](around:$radius,$lat,$lon);
+  relation["amenity"="$type"](around:$radius,$lat,$lon);
+);
+out center;
+''';
+  }
 
-      /// Sometimes Overpass returns HTML or XML if rate limited
-      final raw = res.body.trim();
+  // ===============================================================
+  // PARSE RESULTS
+  // ===============================================================
 
-      if (res.statusCode != 200 || !raw.startsWith('{')) {
-        final preview = raw.length > 160 ? raw.substring(0, 160) : raw;
+  static List<Map<String, dynamic>> _parseElements(
+    List elements, {
+    required String fallbackType,
+  }) {
+    final results = <Map<String, dynamic>>[];
 
-        print('⚠️ Overpass non-JSON/status=${res.statusCode}: $preview');
-        return [];
+    final seen = <String>{};
+
+    for (final element in elements) {
+      if (element is! Map) {
+        continue;
       }
 
-      /// Decode JSON response
-      final data = jsonDecode(raw);
-      final elements = (data['elements'] as List?) ?? const [];
+      double? lat;
+      double? lon;
 
-      final List<Map<String, dynamic>> results = [];
+      // -----------------------------------------------------------
+      // NODE
+      // -----------------------------------------------------------
 
-      /// Extract location details from each element
-      for (final e in elements) {
-        if (e is! Map) continue;
+      if (element['lat'] is num &&
+          element['lon'] is num) {
+        lat = (element['lat'] as num).toDouble();
+        lon = (element['lon'] as num).toDouble();
+      }
 
-        double? lat;
-        double? lon;
+      // -----------------------------------------------------------
+      // WAY / RELATION
+      // -----------------------------------------------------------
 
-        // Some elements contain coordinates directly
-        if (e['lat'] != null && e['lon'] != null) {
-          lat = (e['lat'] as num).toDouble();
-          lon = (e['lon'] as num).toDouble();
-        }
+      else if (element['center'] is Map) {
+        final center = element['center'] as Map;
 
-        // Others store coordinates inside "center"
-        else if (e['center'] != null) {
-          final c = e['center'];
+        final centerLat = center['lat'];
+        final centerLon = center['lon'];
 
-          if (c is Map) {
-            lat = (c['lat'] as num?)?.toDouble();
-            lon = (c['lon'] as num?)?.toDouble();
-          }
-        }
-
-        if (lat != null && lon != null) {
-
-          final tags = (e['tags'] is Map)
-              ? Map<String, dynamic>.from(e['tags'])
-              : <String, dynamic>{};
-
-          results.add({
-            'lat': lat,
-            'lon': lon,
-            'name': (tags['name'] ?? '').toString(),
-            'tags': tags,
-          });
+        if (centerLat is num &&
+            centerLon is num) {
+          lat = centerLat.toDouble();
+          lon = centerLon.toDouble();
         }
       }
 
-      return results;
-    } catch (e) {
+      if (lat == null || lon == null) {
+        continue;
+      }
 
-      /// If API request fails, return empty list
-      print('❌ Overpass Exception: $e');
-      return [];
+      final tags = element['tags'] is Map
+          ? Map<String, dynamic>.from(
+              element['tags'] as Map,
+            )
+          : <String, dynamic>{};
+
+      final key =
+          '${lat.toStringAsFixed(6)},${lon.toStringAsFixed(6)}';
+
+      if (!seen.add(key)) {
+        continue;
+      }
+
+      final rawName =
+          (tags['name'] ?? '').toString().trim();
+
+      final name = rawName.isNotEmpty
+          ? rawName
+          : _fallbackName(
+              type: fallbackType,
+              tags: tags,
+            );
+
+      results.add({
+        'lat': lat,
+        'lon': lon,
+        'name': name,
+        'tags': tags,
+      });
+    }
+
+    return results;
+  }
+
+  // ===============================================================
+  // FALLBACK NAME
+  // ===============================================================
+
+  static String _fallbackName({
+    required String type,
+    required Map<String, dynamic> tags,
+  }) {
+    if (type == 'shelter') {
+      if (tags['emergency'] == 'assembly_point') {
+        return 'Emergency Assembly Point';
+      }
+
+      if (tags['social_facility'] == 'shelter') {
+        return 'Emergency Shelter';
+      }
+
+      return 'Shelter';
+    }
+
+    switch (type) {
+      case 'hospital':
+        return 'Hospital';
+
+      case 'police':
+        return 'Police Station';
+
+      case 'fire_station':
+        return 'Fire Station';
+
+      default:
+        return 'Nearby Place';
     }
   }
 
-  /// Helper function used to format places into
-  /// a readable text list for the chatbot UI.
-  static String formatPlaces(List<Map<String, dynamic>> places, {int limit = 5}) {
+  // ===============================================================
+  // CHAT / TEXT FORMATTER
+  // ===============================================================
 
+  static String formatPlaces(
+    List<Map<String, dynamic>> places, {
+    int limit = 5,
+  }) {
     if (places.isEmpty) {
       return "Nearby places nahi milay. Thori dair baad try karo.";
     }
 
     final take = places.take(limit).toList();
+
     final lines = <String>[];
 
     for (int i = 0; i < take.length; i++) {
-      final p = take[i];
+      final place = take[i];
 
-      final name = (p['name']?.toString().trim().isNotEmpty ?? false)
-          ? p['name'].toString().trim()
-          : (p['tags']?['amenity']?.toString() ?? 'Place');
+      final rawName =
+          place['name']?.toString().trim() ?? '';
 
-      final lat = p['lat'];
-      final lon = p['lon'];
+      final name = rawName.isNotEmpty
+          ? rawName
+          : 'Place';
 
-      lines.add("${i + 1}) $name\n   https://maps.google.com/?q=$lat,$lon");
+      final lat = place['lat'];
+      final lon = place['lon'];
+
+      lines.add(
+        "${i + 1}) $name\n"
+        "   https://maps.google.com/?q=$lat,$lon",
+      );
     }
 
     return lines.join("\n\n");

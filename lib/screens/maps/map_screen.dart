@@ -1,23 +1,33 @@
 // lib/screens/maps/map_screen.dart
+
+import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:disaster_app_ui/widgets/%20bottom_nav.dart';
-import 'package:disaster_app_ui/widgets/app_scaffold.dart'; // ✅ NEW global design
-import 'package:get/get.dart';
+import 'package:disaster_app_ui/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:disaster_app_ui/widgets/popup_utils.dart';
 import 'package:disaster_app_ui/config/colors.dart';
+import 'package:disaster_app_ui/widgets/text_widget.dart';
+import 'package:disaster_app_ui/services/openmap_service.dart';
 
-enum PlaceType { hospital, police, fire_station, shelter }
+enum PlaceType {
+  hospital,
+  police,
+  fire_station,
+  shelter,
+}
 
 class MapsScreen extends StatefulWidget {
-  const MapsScreen({super.key});
+  const MapsScreen({
+    super.key,
+  });
 
   @override
   State<MapsScreen> createState() => _MapsScreenState();
@@ -26,80 +36,307 @@ class MapsScreen extends StatefulWidget {
 class _MapsScreenState extends State<MapsScreen>
     with SingleTickerProviderStateMixin {
   final Location _location = Location();
+
   final MapController _mapController = MapController();
 
-  LatLng _currentPos = const LatLng(31.46318, 73.0847);
+  StreamSubscription<LocationData>? _locationSubscription;
+
+  LatLng _currentPos = const LatLng(
+    31.46318,
+    73.0847,
+  );
+
   List<Marker> _markers = [];
+
   List<LatLng> _polyline = [];
 
   String _distance = "~ Nearby";
+
   String _duration = "-- min";
+
   String _selectedName = "";
 
-  bool _menuOpen = false;
   bool _loadingPlaces = false;
+
+  bool _locationReady = false;
+
   double _currentZoom = 15;
+
+  PlaceType? _selectedPlaceType;
 
   late AnimationController _shimmerCtrl;
 
   static const String orsKey =
       'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImM1YzkzMGFiM2ZjYTRhODc5NjU4MjY1OWVjMzM2ZTJkIiwiaCI6Im11cm11cjY0In0=';
 
+  // ===============================================================
+  // INIT
+  // ===============================================================
+
   @override
   void initState() {
     super.initState();
-    _initLocation();
+
     _shimmerCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(
+        milliseconds: 1200,
+      ),
     )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) {
+        _initLocation();
+      },
+    );
   }
+
+  // ===============================================================
+  // DISPOSE
+  // ===============================================================
 
   @override
   void dispose() {
+    _locationSubscription?.cancel();
+
     _shimmerCtrl.dispose();
+
     super.dispose();
   }
 
+  // ===============================================================
+  // LOCATION
+  // ===============================================================
+
   Future<void> _initLocation() async {
     try {
+      // -----------------------------------------------------------
+      // SERVICE
+      // -----------------------------------------------------------
+
       bool enabled = await _location.serviceEnabled();
-      if (!enabled) enabled = await _location.requestService();
 
-      var perm = await _location.hasPermission();
-      if (perm == PermissionStatus.denied) {
-        perm = await _location.requestPermission();
-      }
-      if (perm != PermissionStatus.granted) return;
-
-      final loc = await _location.getLocation();
-      if (loc.latitude != null && loc.longitude != null) {
-        setState(() => _currentPos = LatLng(loc.latitude!, loc.longitude!));
-        _mapController.move(_currentPos, _currentZoom);
+      if (!enabled) {
+        enabled = await _location.requestService();
       }
 
-      _location.onLocationChanged.listen((loc) {
-        if (loc.latitude == null || loc.longitude == null) return;
-        setState(() => _currentPos = LatLng(loc.latitude!, loc.longitude!));
-      });
-    } catch (_) {}
+      if (!enabled) {
+        if (mounted) {
+          PopupUtils.warning(
+            "Location",
+            "Location services are disabled.",
+          );
+        }
+
+        return;
+      }
+
+      // -----------------------------------------------------------
+      // PERMISSION
+      // -----------------------------------------------------------
+
+      var permission = await _location.hasPermission();
+
+      if (permission == PermissionStatus.denied) {
+        permission = await _location.requestPermission();
+      }
+
+      final permissionGranted = permission == PermissionStatus.granted ||
+          permission == PermissionStatus.grantedLimited;
+
+      if (!permissionGranted) {
+        if (mounted) {
+          PopupUtils.warning(
+            "Location Permission",
+            "Allow location access to find nearby emergency services.",
+          );
+        }
+
+        return;
+      }
+
+      // -----------------------------------------------------------
+      // LOCATION SETTINGS
+      // -----------------------------------------------------------
+
+      try {
+        await _location.changeSettings(
+          accuracy: LocationAccuracy.high,
+          interval: 1000,
+          distanceFilter: 3,
+        );
+      } catch (_) {
+        // Some platforms/settings may ignore this.
+      }
+
+      // -----------------------------------------------------------
+      // INITIAL LOCATION
+      // -----------------------------------------------------------
+
+      try {
+        final loc = await _location.getLocation().timeout(
+              const Duration(
+                seconds: 6,
+              ),
+            );
+
+        final lat = loc.latitude;
+        final lon = loc.longitude;
+
+        if (lat != null &&
+            lon != null &&
+            _validCoordinate(
+              lat,
+              lon,
+            )) {
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _currentPos = LatLng(
+              lat,
+              lon,
+            );
+
+            _locationReady = true;
+          });
+
+          _moveMapToCurrentLocation();
+        }
+      } catch (e) {
+        // Keep existing fallback coordinates if location
+        // cannot be obtained immediately.
+        debugPrint(
+          'Initial location error: $e',
+        );
+      }
+
+      // -----------------------------------------------------------
+      // LIVE LOCATION
+      // -----------------------------------------------------------
+
+      await _locationSubscription?.cancel();
+
+      _locationSubscription = _location.onLocationChanged.listen(
+        (loc) {
+          final lat = loc.latitude;
+          final lon = loc.longitude;
+
+          if (lat == null ||
+              lon == null ||
+              !_validCoordinate(
+                lat,
+                lon,
+              )) {
+            return;
+          }
+
+          if (!mounted) {
+            return;
+          }
+
+          setState(() {
+            _currentPos = LatLng(
+              lat,
+              lon,
+            );
+
+            _locationReady = true;
+          });
+        },
+        onError: (error) {
+          debugPrint(
+            'Location stream error: $error',
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(
+        'Location init error: $e',
+      );
+    }
   }
+
+  // ===============================================================
+  // COORDINATE VALIDATION
+  // ===============================================================
+
+  bool _validCoordinate(
+    double lat,
+    double lon,
+  ) {
+    return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  }
+
+  // ===============================================================
+  // MOVE TO CURRENT LOCATION
+  // ===============================================================
+
+  void _moveMapToCurrentLocation() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) {
+        if (!mounted) {
+          return;
+        }
+
+        try {
+          _mapController.move(
+            _currentPos,
+            _currentZoom,
+          );
+        } catch (e) {
+          debugPrint(
+            'Map move error: $e',
+          );
+        }
+      },
+    );
+  }
+
+  // ===============================================================
+  // ZOOM
+  // ===============================================================
 
   void _zoomIn() {
     setState(() {
-      _currentZoom = (_currentZoom + 1).clamp(3.0, 19.0);
-      _mapController.move(_mapController.camera.center, _currentZoom);
+      _currentZoom = (_currentZoom + 1).clamp(
+        3.0,
+        19.0,
+      );
     });
+
+    _mapController.move(
+      _mapController.camera.center,
+      _currentZoom,
+    );
   }
 
   void _zoomOut() {
     setState(() {
-      _currentZoom = (_currentZoom - 1).clamp(3.0, 19.0);
-      _mapController.move(_mapController.camera.center, _currentZoom);
+      _currentZoom = (_currentZoom - 1).clamp(
+        3.0,
+        19.0,
+      );
     });
+
+    _mapController.move(
+      _mapController.camera.center,
+      _currentZoom,
+    );
   }
 
-  Future<void> _fetchPlaces(PlaceType type) async {
+  // ===============================================================
+  // PLACES
+  // ===============================================================
+
+  Future<void> _fetchPlaces(
+    PlaceType type,
+  ) async {
+    if (_loadingPlaces) {
+      return;
+    }
+
     final amenity = switch (type) {
       PlaceType.hospital => 'hospital',
       PlaceType.police => 'police',
@@ -108,88 +345,172 @@ class _MapsScreenState extends State<MapsScreen>
     };
 
     setState(() {
+      _selectedPlaceType = type;
+
       _loadingPlaces = true;
+
       _markers.clear();
+
       _polyline.clear();
+
+      _selectedName = "";
+
+      _distance = "~ Nearby";
+
+      _duration = "-- min";
     });
 
-    PopupUtils.info("Searching", "Nearby $amenity");
-
-    final query = '''
-[out:json][timeout:25];
-(
-  node["amenity"="$amenity"](around:4000,${_currentPos.latitude},${_currentPos.longitude});
-  way["amenity"="$amenity"](around:4000,${_currentPos.latitude},${_currentPos.longitude});
-  relation["amenity"="$amenity"](around:4000,${_currentPos.latitude},${_currentPos.longitude});
-);
-out center;
-''';
+    PopupUtils.info(
+      "Searching",
+      "Nearby ${_placeLabel(type)}",
+    );
 
     try {
-      final res = await http.post(
-        Uri.parse('https://overpass-api.de/api/interpreter'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'data=${Uri.encodeComponent(query)}',
+      final places = await OpenMapService.fetchNearbyPlaces(
+        center: _currentPos,
+        type: amenity,
+        radius: 5000,
       );
 
-      if (!res.body.trim().startsWith('{')) {
-        PopupUtils.warning("Busy", "Map service busy. Try again.");
+      if (!mounted) {
         return;
       }
 
-      final data = jsonDecode(res.body);
-      final elements = data['elements'] ?? [];
-
       final markers = <Marker>[];
 
-      for (final e in elements) {
-        double? lat, lon;
+      for (final place in places) {
+        final latValue = place['lat'];
+        final lonValue = place['lon'];
 
-        if (e['lat'] != null && e['lon'] != null) {
-          lat = (e['lat'] as num).toDouble();
-          lon = (e['lon'] as num).toDouble();
-        } else if (e['center'] != null) {
-          lat = (e['center']['lat'] as num?)?.toDouble();
-          lon = (e['center']['lon'] as num?)?.toDouble();
+        if (latValue is! num || lonValue is! num) {
+          continue;
         }
 
-        if (lat == null || lon == null) continue;
+        final lat = latValue.toDouble();
 
-        final name = e['tags']?['name'] ?? amenity.capitalizeFirst!;
+        final lon = lonValue.toDouble();
+
+        if (!_validCoordinate(
+          lat,
+          lon,
+        )) {
+          continue;
+        }
+
+        final rawName = (place['name'] ?? '').toString().trim();
+
+        final name = rawName.isNotEmpty ? rawName : _placeLabel(type);
+
+        final destination = LatLng(
+          lat,
+          lon,
+        );
 
         markers.add(
           Marker(
-            point: LatLng(lat, lon),
+            point: destination,
             width: 56,
             height: 56,
             child: GestureDetector(
-              onTap: () => _onSelect(LatLng(lat!, lon!), name),
-              child: const Icon(
-                Icons.location_on,
-                color: AppColor.primary,
-                size: 44,
-              ),
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _onSelect(
+                  destination,
+                  name,
+                );
+              },
+              child: _placeMarker(type),
             ),
           ),
         );
       }
 
-      if (markers.isEmpty) {
-        PopupUtils.warning("No Results", "No $amenity nearby");
-      } else {
-        PopupUtils.success("Found", "${markers.length} locations");
+      if (!mounted) {
+        return;
       }
 
-      setState(() => _markers = markers);
+      setState(() {
+        _markers = markers;
+      });
+
+      // -----------------------------------------------------------
+      // RESULTS
+      // -----------------------------------------------------------
+
+      if (markers.isEmpty) {
+        final serviceError = OpenMapService.lastError;
+
+        if (serviceError != null && serviceError.trim().isNotEmpty) {
+          PopupUtils.warning(
+            "Map Service",
+            "Nearby places could not be loaded. Please try again.",
+          );
+        } else {
+          PopupUtils.warning(
+            "No Results",
+            "No nearby ${_placeLabel(type).toLowerCase()} found.",
+          );
+        }
+      } else {
+        PopupUtils.success(
+          "Found",
+          "${markers.length} locations",
+        );
+      }
     } catch (e) {
-      PopupUtils.error("Map Error", e.toString());
+      if (mounted) {
+        PopupUtils.error(
+          "Map Error",
+          "Unable to load nearby places.",
+        );
+      }
+
+      debugPrint(
+        'Places error: $e',
+      );
     } finally {
-      setState(() => _loadingPlaces = false);
+      if (mounted) {
+        setState(() {
+          _loadingPlaces = false;
+        });
+      }
     }
   }
 
-  Future<void> _onSelect(LatLng dest, String name) async {
-    PopupUtils.info("Routing", "Calculating best path");
+  // ===============================================================
+  // PLACE LABEL
+  // ===============================================================
+
+  String _placeLabel(
+    PlaceType type,
+  ) {
+    switch (type) {
+      case PlaceType.hospital:
+        return "Hospital";
+
+      case PlaceType.police:
+        return "Police";
+
+      case PlaceType.fire_station:
+        return "Fire Station";
+
+      case PlaceType.shelter:
+        return "Shelter";
+    }
+  }
+
+  // ===============================================================
+  // ROUTING API
+  // ===============================================================
+
+  Future<void> _onSelect(
+    LatLng dest,
+    String name,
+  ) async {
+    PopupUtils.info(
+      "Routing",
+      "Calculating best path",
+    );
 
     final url = Uri.parse(
       'https://api.openrouteservice.org/v2/directions/driving-car'
@@ -199,12 +520,107 @@ out center;
     );
 
     try {
-      final res = await http.get(url);
+      final res = await http.get(url).timeout(
+            const Duration(
+              seconds: 20,
+            ),
+          );
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception(
+          'Routing service returned ${res.statusCode}',
+        );
+      }
+
       final data = jsonDecode(res.body);
 
-      final feat = data['features'][0];
-      final seg = feat['properties']['segments'][0];
-      final coords = feat['geometry']['coordinates'] as List;
+      if (data is! Map ||
+          data['features'] is! List ||
+          (data['features'] as List).isEmpty) {
+        throw Exception(
+          'No route available',
+        );
+      }
+
+      final feature = (data['features'] as List).first;
+
+      if (feature is! Map) {
+        throw Exception(
+          'Invalid route response',
+        );
+      }
+
+      final properties = feature['properties'];
+
+      final geometry = feature['geometry'];
+
+      if (properties is! Map || geometry is! Map) {
+        throw Exception(
+          'Invalid route data',
+        );
+      }
+
+      final segments = properties['segments'];
+
+      final coordinates = geometry['coordinates'];
+
+      if (segments is! List ||
+          segments.isEmpty ||
+          coordinates is! List ||
+          coordinates.isEmpty) {
+        throw Exception(
+          'Route information unavailable',
+        );
+      }
+
+      final segment = segments.first;
+
+      if (segment is! Map) {
+        throw Exception(
+          'Invalid route segment',
+        );
+      }
+
+      final distanceValue = segment['distance'];
+
+      final durationValue = segment['duration'];
+
+      if (distanceValue is! num || durationValue is! num) {
+        throw Exception(
+          'Route distance unavailable',
+        );
+      }
+
+      final routePoints = <LatLng>[];
+
+      for (final coordinate in coordinates) {
+        if (coordinate is! List || coordinate.length < 2) {
+          continue;
+        }
+
+        final longitude = coordinate[0];
+
+        final latitude = coordinate[1];
+
+        if (latitude is num && longitude is num) {
+          routePoints.add(
+            LatLng(
+              latitude.toDouble(),
+              longitude.toDouble(),
+            ),
+          );
+        }
+      }
+
+      if (routePoints.isEmpty) {
+        throw Exception(
+          'Route geometry unavailable',
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _markers = [
@@ -212,305 +628,814 @@ out center;
             point: dest,
             width: 56,
             height: 56,
-            child: const Icon(Icons.location_on,
-                color: AppColor.primary, size: 44),
-          )
+            child: _selectedDestinationMarker(),
+          ),
         ];
-        _polyline = coords.map((c) => LatLng(c[1], c[0])).toList();
+
+        _polyline = routePoints;
+
         _selectedName = name;
-        _distance = "${(seg['distance'] / 1000).toStringAsFixed(2)} km";
-        _duration = "${(seg['duration'] / 60).toStringAsFixed(0)} min";
+
+        _distance =
+            "${(distanceValue.toDouble() / 1000).toStringAsFixed(2)} km";
+
+        _duration = "${(durationValue.toDouble() / 60).toStringAsFixed(0)} min";
       });
     } catch (e) {
-      PopupUtils.error("Route Error", e.toString());
+      debugPrint(
+        'Route error: $e',
+      );
+
+      if (mounted) {
+        PopupUtils.error(
+          "Route Error",
+          "Unable to calculate the route right now.",
+        );
+      }
     }
   }
 
+  // ===============================================================
+  // BUILD
+  // ===============================================================
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return AppScaffold(
-      title: "Emergency Map",
-      subtitle: "Find shelters and services near you",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: false,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      bottomNavigationBar: const BottomNavBar(currentIndex: 1),
-      appBarActions: [
-        _circleBtn(
-          Icons.my_location,
-          () => _mapController.move(_currentPos, _currentZoom),
-        ),
-      ],
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: Stack(
-              children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _currentPos,
-                    initialZoom: _currentZoom,
-                    onTap: (_, __) => setState(() => _menuOpen = false),
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.disasteraid.app',
-                    ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: _polyline,
-                          strokeWidth: 5,
-                          color: Colors.blueAccent,
-                        ),
-                      ],
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _currentPos,
-                          width: 56,
-                          height: 56,
-                          child: const Icon(Icons.my_location,
-                              color: AppColor.safeGreen, size: 34),
-                        ),
-                        ..._markers,
-                      ],
-                    ),
-                  ],
-                ),
-
-                // zoom + menu overlays inside map card
-                _zoomControls(),
-                _floatingMenu(),
-                if (_loadingPlaces) _shimmerOverlay(),
-              ],
-            ),
-          ),
-
-          if (_polyline.isNotEmpty) _routeCard(),
-         
-        ],
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
       ),
-    
-    );
-    
-  }
-
-  Widget _zoomControls() => Positioned(
-        left: 14,
-        bottom: 18,
-        child: Column(
-          children: [
-            _circleBtn(Icons.add, _zoomIn),
-            const SizedBox(height: 10),
-            _circleBtn(Icons.remove, _zoomOut),
-          ],
-        ),
-      );
-
-  Widget _shimmerOverlay() => Positioned.fill(
-        child: AnimatedBuilder(
-          animation: _shimmerCtrl,
-          builder: (_, __) => Container(
-            color: Colors.white.withOpacity(0.16),
-          ),
-        ),
-      );
-
-  Widget _routeCard() => Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          margin: const EdgeInsets.only(top: 14),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColor.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColor.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 20,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _selectedName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                        color: AppColor.text,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Distance: $_distance",
-                      style: const TextStyle(
-                        color: AppColor.textMuted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      "Duration: $_duration",
-                      style: const TextStyle(
-                        color: AppColor.textMuted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              _pill(
-                icon: Icons.route_rounded,
-                label: "Route",
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _floatingMenu() {
-    final items = [
-      ('Hospital', Icons.local_hospital, PlaceType.hospital),
-      ('Police', Icons.local_police, PlaceType.police),
-      ('Fire', Icons.local_fire_department, PlaceType.fire_station),
-      ('Shelter', Icons.home_work, PlaceType.shelter),
-    ];
-
-    return Positioned(
-      right: 14,
-      bottom: 18,
+      bottomNavigationBar: const BottomNavBar(
+        currentIndex: 1,
+      ),
       child: Column(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            constraints: BoxConstraints(maxHeight: _menuOpen ? 260 : 0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: AppColor.border),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 20,
-                        color: Colors.black.withOpacity(0.10),
-                        offset: const Offset(0, 12),
+          _pageHeader(),
+          const SizedBox(height: 16),
+          _serviceSelector(),
+          const SizedBox(height: 14),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      24,
+                    ),
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _currentPos,
+                        initialZoom: _currentZoom,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+                          // Keep package identifier unchanged.
+                          userAgentPackageName: 'com.disasteraid.app',
+                        ),
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _polyline,
+                              strokeWidth: 5,
+                              color: AppColor.primary,
+                            ),
+                          ],
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _currentPos,
+                              width: 56,
+                              height: 56,
+                              child: _currentLocationMarker(),
+                            ),
+                            ..._markers,
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 14,
+                  left: 14,
+                  child: _locationStatus(),
+                ),
+                Positioned(
+                  right: 14,
+                  top: 14,
+                  child: Column(
+                    children: [
+                      _mapButton(
+                        icon: Icons.my_location_rounded,
+                        onTap: () {
+                          _moveMapToCurrentLocation();
+                        },
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      _mapButton(
+                        icon: Icons.add_rounded,
+                        onTap: _zoomIn,
+                      ),
+                      const SizedBox(
+                        height: 8,
+                      ),
+                      _mapButton(
+                        icon: Icons.remove_rounded,
+                        onTap: _zoomOut,
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: items
-                        .map((i) => _glassChip(i.$1, i.$2, () {
-                              _fetchPlaces(i.$3);
-                              setState(() => _menuOpen = false);
-                            }))
-                        .toList(),
-                  ),
                 ),
-              ),
+                if (_loadingPlaces) _loadingOverlay(),
+                if (_polyline.isNotEmpty) _routePanel(),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          _circleBtn(
-            _menuOpen ? Icons.close : Icons.place,
-            () => setState(() => _menuOpen = !_menuOpen),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // PAGE HEADER
+  // ===============================================================
+
+  Widget _pageHeader() {
+    return const SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          TextWidget(
+            "Emergency Map",
+            size: 27,
+            weight: FontWeight.w800,
+            color: AppColor.text,
+            align: TextAlign.center,
+          ),
+          SizedBox(height: 5),
+          TextWidget(
+            "Find shelters and services near you",
+            size: 12.5,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _pill({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColor.primary.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColor.primary.withOpacity(0.20)),
-      ),
+  // ===============================================================
+  // SERVICE SELECTOR
+  // ===============================================================
+
+  Widget _serviceSelector() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColor.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColor.primary,
-            ),
+          _serviceItem(
+            type: PlaceType.hospital,
+            icon: Icons.medical_services_outlined,
+            label: "Hospital",
+            color: AppColor.danger,
+          ),
+          const SizedBox(width: 9),
+          _serviceItem(
+            type: PlaceType.police,
+            icon: Icons.local_police_outlined,
+            label: "Police",
+            color: AppColor.info,
+          ),
+          const SizedBox(width: 9),
+          _serviceItem(
+            type: PlaceType.fire_station,
+            icon: Icons.fire_truck_outlined,
+            label: "Fire",
+            color: AppColor.warning,
+          ),
+          const SizedBox(width: 9),
+          _serviceItem(
+            type: PlaceType.shelter,
+            icon: Icons.home_work_outlined,
+            label: "Shelter",
+            color: AppColor.safeGreen,
           ),
         ],
       ),
     );
   }
 
-  Widget _circleBtn(IconData icon, VoidCallback onTap) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 48,
-          width: 48,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.82),
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColor.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 16,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: AppColor.primary),
-        ),
-      );
+  Widget _serviceItem({
+    required PlaceType type,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    final selected = _selectedPlaceType == type;
 
-  Widget _glassChip(String label, IconData icon, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 5),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(
+          16,
+        ),
+        onTap: () {
+          _fetchPlaces(type);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 180,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 11,
+          ),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(40),
-            border: Border.all(color: AppColor.border),
+            color: selected ? color : AppColor.surface,
+            borderRadius: BorderRadius.circular(
+              16,
+            ),
+            border: Border.all(
+              color: selected ? color : AppColor.border,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(
+                        0.18,
+                      ),
+                      blurRadius: 14,
+                      offset: const Offset(
+                        0,
+                        6,
+                      ),
+                    ),
+                  ]
+                : [],
           ),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: AppColor.primary),
-              const SizedBox(width: 8),
-              Text(
+              Icon(
+                icon,
+                size: 19,
+                color: selected ? Colors.white : color,
+              ),
+              const SizedBox(
+                width: 8,
+              ),
+              TextWidget(
                 label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColor.text,
-                ),
+                size: 12.5,
+                weight: FontWeight.w800,
+                color: selected ? Colors.white : AppColor.text,
               ),
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  // ===============================================================
+  // CURRENT LOCATION MARKER
+  // ===============================================================
+
+  Widget _currentLocationMarker() {
+    return Center(
+      child: Container(
+        width: 34,
+        height: 34,
+        padding: const EdgeInsets.all(
+          5,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.primary.withOpacity(
+                0.22,
+              ),
+              blurRadius: 14,
+              offset: const Offset(
+                0,
+                5,
+              ),
+            ),
+          ],
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColor.safeGreen,
+            shape: BoxShape.circle,
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.navigation_rounded,
+              color: Colors.white,
+              size: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // PLACE MARKER
+  // ===============================================================
+
+  Widget _placeMarker(
+    PlaceType type,
+  ) {
+    final color = _colorForPlaceType(
+      type,
+    );
+
+    final icon = _iconForPlaceType(
+      type,
+    );
+
+    return Center(
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: AppColor.surface,
+          borderRadius: BorderRadius.circular(
+            16,
+          ),
+          border: Border.all(
+            color: color.withOpacity(
+              0.30,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(
+                0.12,
+              ),
+              blurRadius: 12,
+              offset: const Offset(
+                0,
+                6,
+              ),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 23,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // SELECTED MARKER
+  // ===============================================================
+
+  Widget _selectedDestinationMarker() {
+    final color = _selectedPlaceType == null
+        ? AppColor.primary
+        : _colorForPlaceType(
+            _selectedPlaceType!,
+          );
+
+    final icon = _selectedPlaceType == null
+        ? Icons.location_on_rounded
+        : _iconForPlaceType(
+            _selectedPlaceType!,
+          );
+
+    return Center(
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(
+            16,
+          ),
+          border: Border.all(
+            color: Colors.white,
+            width: 3,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(
+                0.30,
+              ),
+              blurRadius: 16,
+              offset: const Offset(
+                0,
+                7,
+              ),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 23,
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // LOCATION STATUS
+  // ===============================================================
+
+  Widget _locationStatus() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 9,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.surface.withOpacity(
+          0.94,
+        ),
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        border: Border.all(
+          color: AppColor.border,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(
+              0.08,
+            ),
+            blurRadius: 14,
+            offset: const Offset(
+              0,
+              6,
+            ),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _locationReady
+                ? Icons.radio_button_checked_rounded
+                : Icons.location_searching_rounded,
+            color: _locationReady ? AppColor.safeGreen : AppColor.warning,
+            size: 16,
+          ),
+          const SizedBox(
+            width: 7,
+          ),
+          TextWidget(
+            _locationReady ? "Live location" : "Locating...",
+            size: 11.5,
+            weight: FontWeight.w700,
+            color: AppColor.text,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // MAP CONTROL
+  // ===============================================================
+
+  Widget _mapButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(
+          14,
+        ),
+        onTap: onTap,
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: AppColor.surface.withOpacity(
+              0.96,
+            ),
+            borderRadius: BorderRadius.circular(
+              14,
+            ),
+            border: Border.all(
+              color: AppColor.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(
+                  0.09,
+                ),
+                blurRadius: 14,
+                offset: const Offset(
+                  0,
+                  6,
+                ),
+              ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: AppColor.primary,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // ROUTE PANEL
+  // ===============================================================
+
+  Widget _routePanel() {
+    return Positioned(
+      left: 14,
+      right: 14,
+      bottom: 14,
+      child: Container(
+        padding: const EdgeInsets.all(
+          16,
+        ),
+        decoration: BoxDecoration(
+          color: AppColor.surface,
+          borderRadius: BorderRadius.circular(
+            20,
+          ),
+          border: Border.all(
+            color: AppColor.border,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(
+                0.12,
+              ),
+              blurRadius: 22,
+              offset: const Offset(
+                0,
+                10,
+              ),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColor.primarySoft,
+                    borderRadius: BorderRadius.circular(
+                      14,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.route_rounded,
+                    color: AppColor.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(
+                  width: 12,
+                ),
+                Expanded(
+                  child: TextWidget(
+                    _selectedName,
+                    size: 15,
+                    weight: FontWeight.w900,
+                    color: AppColor.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(
+              height: 14,
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: _routeInfo(
+                    icon: Icons.straighten_rounded,
+                    label: "Distance",
+                    value: _distance,
+                  ),
+                ),
+                const SizedBox(
+                  width: 10,
+                ),
+                Expanded(
+                  child: _routeInfo(
+                    icon: Icons.schedule_rounded,
+                    label: "Travel time",
+                    value: _duration,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // ROUTE INFO
+  // ===============================================================
+
+  Widget _routeInfo({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.inputFill,
+        borderRadius: BorderRadius.circular(
+          13,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: AppColor.primary,
+            size: 18,
+          ),
+          const SizedBox(
+            width: 8,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  label,
+                  size: 9.5,
+                  color: AppColor.textMuted,
+                ),
+                const SizedBox(
+                  height: 2,
+                ),
+                TextWidget(
+                  value,
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: AppColor.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // LOADING
+  // ===============================================================
+
+  Widget _loadingOverlay() {
+    return Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _shimmerCtrl,
+        builder: (_, __) {
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(
+                24,
+              ),
+              color: Colors.white.withOpacity(
+                0.20,
+              ),
+            ),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  borderRadius: BorderRadius.circular(
+                    15,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(
+                        0.10,
+                      ),
+                      blurRadius: 16,
+                      offset: const Offset(
+                        0,
+                        7,
+                      ),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: AppColor.primary,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 10,
+                    ),
+                    TextWidget(
+                      "Searching nearby",
+                      size: 12,
+                      weight: FontWeight.w700,
+                      color: AppColor.text,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ===============================================================
+  // COLORS
+  // ===============================================================
+
+  Color _colorForPlaceType(
+    PlaceType type,
+  ) {
+    switch (type) {
+      case PlaceType.hospital:
+        return AppColor.danger;
+
+      case PlaceType.police:
+        return AppColor.info;
+
+      case PlaceType.fire_station:
+        return AppColor.warning;
+
+      case PlaceType.shelter:
+        return AppColor.safeGreen;
+    }
+  }
+
+  // ===============================================================
+  // ICONS
+  // ===============================================================
+
+  IconData _iconForPlaceType(
+    PlaceType type,
+  ) {
+    switch (type) {
+      case PlaceType.hospital:
+        return Icons.medical_services_rounded;
+
+      case PlaceType.police:
+        return Icons.local_police_rounded;
+
+      case PlaceType.fire_station:
+        return Icons.fire_truck_rounded;
+
+      case PlaceType.shelter:
+        return Icons.home_work_rounded;
+    }
+  }
 }

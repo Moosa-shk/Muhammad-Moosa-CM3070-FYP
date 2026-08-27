@@ -1,41 +1,16 @@
 // ===============================================================
 // learning_screen.dart
-// ---------------------------------------------------------------
-// This screen provides educational resources to help users
-// understand disaster preparedness and emergency safety.
-//
-// Users can select different disaster topics such as:
-//
-// • Earthquake safety
-// • Flood awareness
-// • Fire emergency response
-// • General disaster preparedness
-//
-// Each topic contains:
-// - A summary of the safety guidelines
-// - Key highlight reminders
-// - An offline PDF guide that opens inside the app
-//
-// The PDF viewer allows users to read disaster safety guides
-// without requiring an internet connection.
 // ===============================================================
 
 import 'package:disaster_app_ui/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:disaster_app_ui/config/colors.dart';
+import 'package:disaster_app_ui/widgets/text_widget.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-
-// ===============================================================
-// LEARNING SCREEN
-// ---------------------------------------------------------------
-// Displays a list of disaster preparedness topics that open
-// detailed PDF safety guides when selected.
-// ===============================================================
 
 class LearningScreen extends StatelessWidget {
   const LearningScreen({super.key});
 
-  /// Static list of disaster learning topics
   static const List<Map<String, dynamic>> _topics = [
     {
       "title": "Earthquake Safety",
@@ -98,208 +73,421 @@ class LearningScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "Learning & Knowledge",
-      subtitle: "Tap a topic to open the PDF guide (offline).",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: true,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 10),
-
-          /// Generate a topic card for each disaster topic
-          for (final t in _topics) _TopicCard(topic: t),
-
+          const SizedBox(height: 2),
+          _pageHeader(),
+          const SizedBox(height: 22),
+          _libraryBanner(),
           const SizedBox(height: 26),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "Safety Guides",
+                      size: 18,
+                      weight: FontWeight.w900,
+                      color: AppColor.text,
+                    ),
+                    SizedBox(height: 3),
+                    TextWidget(
+                      "Choose a topic to start reading",
+                      size: 11.5,
+                      color: AppColor.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.primarySoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: TextWidget(
+                  "${_topics.length}",
+                  size: 11,
+                  weight: FontWeight.w900,
+                  color: AppColor.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (int i = 0; i < _topics.length; i++) ...[
+            _TopicCard(
+              topic: _topics[i],
+              accent: _topicColor(i),
+            ),
+            if (i != _topics.length - 1) const SizedBox(height: 14),
+          ],
+          const SizedBox(height: 30),
         ],
       ),
     );
   }
+
+  Widget _pageHeader() {
+    return const SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          TextWidget(
+            "Learning & Knowledge",
+            size: 27,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+            align: TextAlign.center,
+          ),
+          SizedBox(height: 5),
+          TextWidget(
+            "Offline emergency preparedness guides",
+            size: 12.5,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _libraryBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColor.secondary,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.secondary.withOpacity(0.14),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: const Icon(
+              Icons.menu_book_outlined,
+              color: Colors.white,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  "Preparedness Library",
+                  size: 15.5,
+                  weight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+                SizedBox(height: 4),
+                TextWidget(
+                  "Guides remain available without internet",
+                  size: 11.5,
+                  color: Color(0xCFFFFFFF),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.09),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.offline_pin_outlined,
+              color: AppColor.safeGreen,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Color _topicColor(int index) {
+    switch (index) {
+      case 0:
+        return AppColor.warning;
+      case 1:
+        return AppColor.info;
+      case 2:
+        return AppColor.danger;
+      case 3:
+        return AppColor.safeGreen;
+      default:
+        return AppColor.primary;
+    }
+  }
 }
 
-// ===============================================================
+// =================================================================
 // TOPIC CARD
-// ---------------------------------------------------------------
-// Displays a disaster learning topic including:
-//
-// • Title
-// • Summary
-// • Safety highlights
-// • Navigation arrow
-//
-// When tapped, the PDF safety guide is opened.
-// ===============================================================
+// =================================================================
 
 class _TopicCard extends StatelessWidget {
-  const _TopicCard({required this.topic});
+  const _TopicCard({
+    required this.topic,
+    required this.accent,
+  });
 
   final Map<String, dynamic> topic;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final title = (topic["title"] ?? "").toString();
     final subtitle = (topic["subtitle"] ?? "").toString();
     final summary = (topic["summary"] ?? "").toString();
+
     final icon = (topic["icon"] as IconData?) ?? Icons.picture_as_pdf_rounded;
+
     final highlights = (topic["highlights"] as List).cast<String>();
+
     final assetPath = (topic["asset"] ?? "").toString();
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-
-      /// Navigate to PDF reader
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PdfReaderScreen(
-              title: title,
-              subtitle: subtitle,
-              assetPath: assetPath,
-              highlights: highlights,
-            ),
-          ),
-        );
-      },
-
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(18),
-
-        decoration: BoxDecoration(
-          color: AppColor.surface,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppColor.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            /// Topic icon
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: AppColor.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColor.primary.withOpacity(0.18)),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PdfReaderScreen(
+                title: title,
+                subtitle: subtitle,
+                assetPath: assetPath,
+                highlights: highlights,
               ),
-              child: Icon(icon, color: AppColor.primary, size: 26),
             ),
-
-            const SizedBox(width: 14),
-
-            /// Topic details
-            Expanded(
-              child: Column(
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(17),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppColor.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.shadow,
+                blurRadius: 14,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
-                  /// Topic title
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: AppColor.text,
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: accent,
+                      size: 25,
                     ),
                   ),
-
-                  const SizedBox(height: 6),
-
-                  /// Short description
-                  Text(
-                    summary,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                      color: AppColor.textMuted,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextWidget(
+                          title,
+                          size: 16,
+                          weight: FontWeight.w900,
+                          color: AppColor.text,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: accent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            TextWidget(
+                              "${highlights.length} key reminders",
+                              size: 10.5,
+                              weight: FontWeight.w700,
+                              color: AppColor.textMuted,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
-                  /// Display quick highlight reminders
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: highlights.take(3).map((h) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColor.primary.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: AppColor.primary.withOpacity(0.18),
-                          ),
-                        ),
-                        child: Text(
-                          h,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: AppColor.primary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  /// Subtitle text
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColor.inputFill,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 18,
                       color: AppColor.textMuted,
                     ),
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(width: 10),
-
-            /// Navigation arrow
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: AppColor.textMuted,
-            ),
-          ],
+              const SizedBox(height: 15),
+              TextWidget(
+                summary,
+                size: 12.5,
+                color: AppColor.textMuted,
+              ),
+              const SizedBox(height: 15),
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                children: [
+                  for (final reminder in highlights.take(2))
+                    _ReminderChip(
+                      text: reminder,
+                      accent: accent,
+                    ),
+                  if (highlights.length > 2)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColor.inputFill,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: TextWidget(
+                        "+${highlights.length - 2} more",
+                        size: 10,
+                        weight: FontWeight.w800,
+                        color: AppColor.textMuted,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.picture_as_pdf_outlined,
+                      size: 17,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextWidget(
+                        subtitle,
+                        size: 10.5,
+                        weight: FontWeight.w800,
+                        color: accent,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 19,
+                      color: accent,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ===============================================================
-// PDF READER SCREEN
-// ---------------------------------------------------------------
-// Opens and displays the disaster safety guide PDF.
-//
-// Features:
-//
-// • Offline PDF viewing
-// • Page number indicator
-// • Zoom reset button
-// • Error handling if PDF fails to load
-// • Highlight reminders displayed above the PDF
-// ===============================================================
+class _ReminderChip extends StatelessWidget {
+  const _ReminderChip({
+    required this.text,
+    required this.accent,
+  });
+
+  final String text;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: accent.withOpacity(0.12),
+        ),
+      ),
+      child: TextWidget(
+        text,
+        size: 10,
+        weight: FontWeight.w700,
+        color: accent,
+      ),
+    );
+  }
+}
+
+// =================================================================
+// PDF READER
+// =================================================================
 
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
@@ -320,8 +508,6 @@ class PdfReaderScreen extends StatefulWidget {
 }
 
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
-
-  /// Controller for Syncfusion PDF viewer
   final PdfViewerController _controller = PdfViewerController();
 
   int _currentPage = 1;
@@ -329,7 +515,6 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   String? _loadError;
 
-  /// Reset zoom level
   void _resetZoom() {
     _controller.zoomLevel = 1.0;
   }
@@ -337,162 +522,256 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: widget.title,
-      subtitle: widget.subtitle,
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: false,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-
-      /// AppBar actions
-      appBarActions: [
-
-        /// Page indicator
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.72),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColor.border),
-            ),
-            child: Text(
-              "$_currentPage/$_totalPages",
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColor.secondary,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        /// Reset zoom button
-        IconButton(
-          tooltip: "Reset zoom",
-          onPressed: _resetZoom,
-          icon: const Icon(
-            Icons.zoom_out_map_rounded,
-            color: AppColor.primary,
-          ),
-        ),
-      ],
-
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          const SizedBox(height: 10),
-
-          // ==========================================================
-          // QUICK REMINDERS SECTION
-          // ==========================================================
-
-          Container(
-            padding: const EdgeInsets.all(16),
-
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.72),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColor.border),
-            ),
-
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                const Text(
-                  "Quick reminders",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: AppColor.text,
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                /// Display highlight reminders
-                for (final h in widget.highlights)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: AppColor.primary,
-                        ),
-
-                        const SizedBox(width: 10),
-
-                        Expanded(
-                          child: Text(
-                            h,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              height: 1.4,
-                              fontWeight: FontWeight.w700,
-                              color: AppColor.textMuted,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
+          const SizedBox(height: 2),
+          _readerHeader(),
           const SizedBox(height: 14),
-
-          // ==========================================================
-          // PDF VIEWER
-          // ==========================================================
-
+          _quickReminders(),
+          const SizedBox(height: 14),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColor.cardFill,
+                color: AppColor.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColor.border),
+                border: Border.all(
+                  color: AppColor.border,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColor.shadow,
+                    blurRadius: 14,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
               ),
-
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
-
-                child: SfPdfViewer.asset(
-                  widget.assetPath,
-
-                  controller: _controller,
-
-                  /// When PDF loads successfully
-                  onDocumentLoaded: (details) {
-                    setState(() {
-                      _totalPages = details.document.pages.count;
-                      _currentPage = 1;
-                      _loadError = null;
-                    });
-                  },
-
-                  /// When user changes page
-                  onPageChanged: (details) {
-                    setState(() => _currentPage = details.newPageNumber);
-                  },
-
-                  /// Handle load error
-                  onDocumentLoadFailed: (details) {
-                    setState(() {
-                      _loadError = details.description;
-                    });
-                  },
+                child: Stack(
+                  children: [
+                    SfPdfViewer.asset(
+                      widget.assetPath,
+                      controller: _controller,
+                      onDocumentLoaded: (details) {
+                        setState(() {
+                          _totalPages = details.document.pages.count;
+                          _currentPage = 1;
+                          _loadError = null;
+                        });
+                      },
+                      onPageChanged: (details) {
+                        setState(() {
+                          _currentPage = details.newPageNumber;
+                        });
+                      },
+                      onDocumentLoadFailed: (details) {
+                        setState(() {
+                          _loadError = details.description;
+                        });
+                      },
+                    ),
+                    if (_loadError != null)
+                      Positioned.fill(
+                        child: Container(
+                          color: AppColor.surface,
+                          alignment: Alignment.center,
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 62,
+                                  height: 62,
+                                  decoration: BoxDecoration(
+                                    color: AppColor.dangerSoft,
+                                    borderRadius: BorderRadius.circular(
+                                      18,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.picture_as_pdf_outlined,
+                                    color: AppColor.danger,
+                                    size: 30,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                const TextWidget(
+                                  "Unable to open guide",
+                                  size: 16,
+                                  weight: FontWeight.w900,
+                                  color: AppColor.text,
+                                  align: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
+                                TextWidget(
+                                  _loadError!,
+                                  size: 11.5,
+                                  color: AppColor.textMuted,
+                                  align: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 12),
         ],
+      ),
+    );
+  }
+
+  Widget _readerHeader() {
+    return Column(
+      children: [
+        TextWidget(
+          widget.title,
+          size: 24,
+          weight: FontWeight.w900,
+          color: AppColor.text,
+          align: TextAlign.center,
+        ),
+        const SizedBox(height: 5),
+        TextWidget(
+          widget.subtitle,
+          size: 11.5,
+          color: AppColor.textMuted,
+          align: TextAlign.center,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.inputFill,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColor.border,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.layers_outlined,
+                      size: 18,
+                      color: AppColor.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    TextWidget(
+                      "Page $_currentPage of $_totalPages",
+                      size: 11.5,
+                      weight: FontWeight.w800,
+                      color: AppColor.text,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _resetZoom,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColor.secondary,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColor.secondary.withOpacity(0.14),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.center_focus_strong_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _quickReminders() {
+    return SizedBox(
+      height: 58,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: widget.highlights.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final reminder = widget.highlights[index];
+
+          return Container(
+            width: 220,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 9,
+            ),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColor.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    color: AppColor.safeSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppColor.safeGreen,
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: TextWidget(
+                    reminder,
+                    size: 10.5,
+                    weight: FontWeight.w700,
+                    color: AppColor.text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

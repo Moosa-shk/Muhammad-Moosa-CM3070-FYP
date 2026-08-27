@@ -1,5 +1,5 @@
 name: disaster_app_ui
-description: DisasterAid complete updated project
+description: RescueAid complete updated project
 publish_to: "none"
 
 version: 1.0.0+1
@@ -26,7 +26,6 @@ dependencies:
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.1.3
 
-  # ✅ Keep only ONE PDF viewer (Syncfusion)
   syncfusion_flutter_pdfviewer: ^26.2.14
 
   hive: ^2.2.3

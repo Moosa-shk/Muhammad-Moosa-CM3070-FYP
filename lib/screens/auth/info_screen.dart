@@ -1,23 +1,4 @@
-// ===============================================================
-// InfoScreen
-// ---------------------------------------------------------------
-// This screen allows the user to complete or update their
-// personal profile information after authentication.
-//
-// The screen collects important user details such as:
-// • Full name
-// • Phone number
-// • Emergency contact
-// • Blood group
-// • Profile picture
-//
-// The data is stored in Firebase Firestore and the profile
-// image is uploaded to Cloudinary.
-//
-// This information can be important during emergencies
-// in disaster scenarios, allowing responders or contacts
-// to access critical personal details quickly.
-// ===============================================================
+// lib/screens/auth/info_screen.dart
 
 import 'dart:io';
 
@@ -26,9 +7,9 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../config/colors.dart';
+import '../../services/cloudinary_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/text_widget.dart';
-import '../../services/cloudinary_service.dart';
 import '../dashboard/home_screen.dart';
 import 'auth_controller.dart';
 
@@ -40,26 +21,14 @@ class InfoScreen extends StatefulWidget {
 }
 
 class _InfoScreenState extends State<InfoScreen> {
-  /// Indicates whether the profile is currently being saved
   bool _saving = false;
-
-  /// Stores the locally selected image before uploading
   File? _pickedImage;
 
-  /// Controllers for user input fields
   final name = TextEditingController();
   final phone = TextEditingController();
   final emergency = TextEditingController();
 
-  /// Default blood group
   String bloodGroup = "A+";
-
-  // ===============================================================
-  // initState()
-  // ---------------------------------------------------------------
-  // When the screen loads, existing user data is retrieved from
-  // AuthController and used to pre-fill the form fields.
-  // ===============================================================
 
   @override
   void initState() {
@@ -75,212 +44,231 @@ class _InfoScreenState extends State<InfoScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    name.dispose();
+    phone.dispose();
+    emergency.dispose();
+    super.dispose();
+  }
+
   // ===============================================================
-  // _pickImage()
-  // ---------------------------------------------------------------
-  // Opens the device gallery and allows the user to select
-  // a profile picture. The image is stored locally until it
-  // is uploaded during the save process.
+  // IMAGE PICKER - PRESERVED
   // ===============================================================
 
   Future<void> _pickImage() async {
-    final img = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final img = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+    );
 
     if (img != null) {
-      setState(() => _pickedImage = File(img.path));
+      setState(() {
+        _pickedImage = File(img.path);
+      });
     }
   }
 
   // ===============================================================
-  // UI BUILD
+  // SAVE PROFILE - PRESERVED
+  // ===============================================================
+
+  Future<void> _saveProfile() async {
+    final user = AuthController.to.currentUser.value;
+
+    if (name.text.trim().isEmpty) {
+      Get.snackbar(
+        "Missing Info",
+        "Name is required",
+        backgroundColor: AppColor.danger,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    String? imgUrl = user?.profileImage;
+
+    if (_pickedImage != null) {
+      try {
+        imgUrl = await CloudinaryService.uploadImageUnsigned(
+          _pickedImage!,
+        );
+      } catch (e) {
+        if (!mounted) return;
+
+        setState(() {
+          _saving = false;
+        });
+
+        Get.snackbar(
+          "Upload Failed",
+          "$e",
+          backgroundColor: AppColor.danger,
+          colorText: Colors.white,
+        );
+
+        return;
+      }
+    }
+
+    final err = await AuthController.to.updateProfileSafe(
+      name: name.text.trim(),
+      phone: phone.text.trim().isEmpty
+          ? null
+          : phone.text.trim(),
+      emergencyContact: emergency.text.trim().isEmpty
+          ? null
+          : emergency.text.trim(),
+      bloodGroup: bloodGroup,
+      profileImage: imgUrl,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _saving = false;
+    });
+
+    if (err != null) {
+      Get.snackbar(
+        "Save Failed",
+        err,
+        backgroundColor: AppColor.danger,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    Get.offAll(
+      () => const HomeScreen(),
+    );
+  }
+
+  // ===============================================================
+  // BUILD
   // ===============================================================
 
   @override
   Widget build(BuildContext context) {
     final user = AuthController.to.currentUser.value;
 
-    /// Determines which image should be displayed
     ImageProvider? provider;
 
     if (_pickedImage != null) {
       provider = FileImage(_pickedImage!);
     } else if ((user?.profileImage ?? "").isNotEmpty) {
-      provider = NetworkImage(user!.profileImage!);
+      provider = NetworkImage(
+        user!.profileImage!,
+      );
     }
 
     return Scaffold(
       backgroundColor: AppColor.bg,
-
-      // ===============================================================
-      // APP BAR
-      // ===============================================================
-
-      appBar: AppBar(
-        backgroundColor: AppColor.bg,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColor.secondary,
-            size: 20,
-          ),
-          onPressed: () => Get.back(),
-        ),
-        title: const TextWidget(
-          "Profile Information",
-          weight: FontWeight.w900,
-          size: 18,
-          color: AppColor.secondary,
-        ),
-      ),
-
-      // ===============================================================
-      // BODY
-      // ===============================================================
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+      body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            // =====================================================
+            // TOP BAR
+            // =====================================================
 
-            // ===============================================================
-            // PROFILE AVATAR
-            // ---------------------------------------------------------------
-            // Allows the user to tap and select a profile image.
-            // ===============================================================
+            _topBar(),
 
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColor.primary.withOpacity(0.25),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 18,
-                      offset: const Offset(0, 10),
+            // =====================================================
+            // CONTENT
+            // =====================================================
+
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  18,
+                  20,
+                  34,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // =================================================
+                    // PROFILE PHOTO AREA
+                    // =================================================
+
+                    _profileHeader(
+                      provider: provider,
                     ),
+
+                    const SizedBox(height: 30),
+
+                    // =================================================
+                    // PERSONAL DETAILS
+                    // =================================================
+
+                    const _SectionTitle(
+                      title: "Personal details",
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    _field(
+                      controller: name,
+                      label: "Full name",
+                      icon: Icons.person_outline_rounded,
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _field(
+                      controller: phone,
+                      label: "Phone number",
+                      icon: Icons.phone_outlined,
+                      keyboard: TextInputType.phone,
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // =================================================
+                    // EMERGENCY DETAILS
+                    // =================================================
+
+                    const _SectionTitle(
+                      title: "Emergency details",
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    _field(
+                      controller: emergency,
+                      label: "Emergency contact",
+                      icon: Icons.contact_phone_outlined,
+                      keyboard: TextInputType.phone,
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _bloodDropdown(),
+
+                    const SizedBox(height: 30),
+
+                    // =================================================
+                    // SAVE
+                    // =================================================
+
+                    CustomButton(
+                      title: _saving
+                          ? "Saving..."
+                          : "Save changes",
+                      onTap: _saving
+                          ? null
+                          : _saveProfile,
+                      loading: _saving,
+                    ),
+
+                    const SizedBox(height: 12),
                   ],
                 ),
-                child: CircleAvatar(
-                  radius: 46,
-                  backgroundImage: provider,
-                  backgroundColor: Colors.white,
-                  child: provider == null
-                      ? Icon(
-                          Icons.camera_alt_rounded,
-                          size: 30,
-                          color: AppColor.textMuted.withOpacity(0.9),
-                        )
-                      : null,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ===============================================================
-            // INPUT FIELDS
-            // ===============================================================
-
-            _field(name, "Full Name"),
-            const SizedBox(height: 14),
-
-            _field(phone, "Phone", keyboard: TextInputType.phone),
-            const SizedBox(height: 14),
-
-            _field(
-              emergency,
-              "Emergency Contact",
-              keyboard: TextInputType.phone,
-            ),
-            const SizedBox(height: 14),
-
-            _dropdown(),
-            const SizedBox(height: 26),
-
-            // ===============================================================
-            // SAVE BUTTON
-            // ===============================================================
-
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                title: _saving ? "Saving..." : "Save",
-                onTap: _saving
-                    ? null
-                    : () async {
-                        // Validate name field
-                        if (name.text.trim().isEmpty) {
-                          Get.snackbar(
-                            "Missing Info",
-                            "Name is required",
-                            backgroundColor: AppColor.danger,
-                            colorText: Colors.white,
-                          );
-                          return;
-                        }
-
-                        setState(() => _saving = true);
-
-                        String? imgUrl = user?.profileImage;
-
-                        // Upload image if user selected a new one
-                        if (_pickedImage != null) {
-                          try {
-                            imgUrl =
-                                await CloudinaryService.uploadImageUnsigned(
-                                    _pickedImage!);
-                          } catch (e) {
-                            setState(() => _saving = false);
-
-                            Get.snackbar(
-                              "Upload Failed",
-                              "$e",
-                              backgroundColor: AppColor.danger,
-                              colorText: Colors.white,
-                            );
-                            return;
-                          }
-                        }
-
-                        // Update profile in Firestore
-                        final err =
-                            await AuthController.to.updateProfileSafe(
-                          name: name.text.trim(),
-                          phone: phone.text.trim().isEmpty
-                              ? null
-                              : phone.text.trim(),
-                          emergencyContact: emergency.text.trim().isEmpty
-                              ? null
-                              : emergency.text.trim(),
-                          bloodGroup: bloodGroup,
-                          profileImage: imgUrl,
-                        );
-
-                        setState(() => _saving = false);
-
-                        if (err != null) {
-                          Get.snackbar(
-                            "Save Failed",
-                            err,
-                            backgroundColor: AppColor.danger,
-                            colorText: Colors.white,
-                          );
-                          return;
-                        }
-
-                        // Navigate to home screen after success
-                        Get.offAll(() => const HomeScreen());
-                      },
-                loading: _saving,
               ),
             ),
           ],
@@ -290,94 +278,353 @@ class _InfoScreenState extends State<InfoScreen> {
   }
 
   // ===============================================================
-  // BLOOD GROUP DROPDOWN
+  // TOP BAR
   // ===============================================================
 
-  Widget _dropdown() {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+  Widget _topBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        8,
       ),
-      child: DropdownButton<String>(
-        value: bloodGroup,
-        isExpanded: true,
-        underline: const SizedBox(),
-        dropdownColor: Colors.white,
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: AppColor.textMuted,
-        ),
-        items: const ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-            .map((e) => DropdownMenuItem(
-                  value: e,
-                  child: TextWidget(
-                    e,
-                    weight: FontWeight.w700,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Center(
+            child: TextWidget(
+              "Profile",
+              size: 18,
+              weight: FontWeight.w900,
+              color: AppColor.text,
+            ),
+          ),
+
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => Get.back(),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColor.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColor.border,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 21,
                     color: AppColor.secondary,
                   ),
-                ))
-            .toList(),
-        onChanged: (val) => setState(() => bloodGroup = val!),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // ===============================================================
-  // TEXT FIELD UI COMPONENT
+  // PROFILE HEADER
   // ===============================================================
 
-  Widget _field(
-    TextEditingController c,
-    String hint, {
+  Widget _profileHeader({
+    required ImageProvider? provider,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onTap: _pickImage,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColor.border,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.shadow,
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  backgroundColor: AppColor.inputFill,
+                  backgroundImage: provider,
+                  child: provider == null
+                      ? const Icon(
+                          Icons.person_outline_rounded,
+                          size: 34,
+                          color: AppColor.textMuted,
+                        )
+                      : null,
+                ),
+              ),
+
+              Positioned(
+                right: -1,
+                bottom: 1,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: AppColor.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColor.bg,
+                      width: 3,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 18),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TextWidget(
+                "Profile photo",
+                size: 16,
+                weight: FontWeight.w900,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 5),
+
+              const TextWidget(
+                "Tap the photo to update it",
+                size: 12,
+                color: AppColor.textMuted,
+              ),
+
+              const SizedBox(height: 9),
+
+              GestureDetector(
+                onTap: _pickImage,
+                child: const TextWidget(
+                  "Change photo",
+                  size: 12,
+                  weight: FontWeight.w900,
+                  color: AppColor.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===============================================================
+  // FIELD
+  // ===============================================================
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
     TextInputType keyboard = TextInputType.text,
-    bool highlight = false,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: highlight
-              ? AppColor.primary.withOpacity(0.55)
-              : Colors.transparent,
-          width: 1.6,
+          color: AppColor.borderStrong,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboard,
+        cursorColor: AppColor.primary,
+        style: const TextStyle(
+          color: AppColor.text,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(
+            color: AppColor.textMuted,
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+          ),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(11),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColor.inputFill,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: AppColor.primary,
+              ),
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 17,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // BLOOD GROUP
+  // ===============================================================
+
+  Widget _bloodDropdown() {
+    const groups = [
+      "A+",
+      "A-",
+      "B+",
+      "B-",
+      "O+",
+      "O-",
+      "AB+",
+      "AB-",
+    ];
+
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColor.borderStrong,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColor.dangerSoft,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(
+              Icons.bloodtype_outlined,
+              size: 18,
+              color: AppColor.danger,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: bloodGroup,
+                isExpanded: true,
+                dropdownColor: AppColor.surface,
+                borderRadius: BorderRadius.circular(14),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColor.textMuted,
+                ),
+                style: const TextStyle(
+                  color: AppColor.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+                items: groups
+                    .map(
+                      (group) => DropdownMenuItem<String>(
+                        value: group,
+                        child: Text(
+                          group,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      bloodGroup = value;
+                    });
+                  }
+                },
+              ),
+            ),
           ),
         ],
       ),
-      child: TextField(
-        controller: c,
-        keyboardType: keyboard,
-        style: const TextStyle(
+    );
+  }
+}
+
+// =================================================================
+// SECTION TITLE
+// =================================================================
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.title,
+  });
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        TextWidget(
+          title,
+          size: 14,
+          weight: FontWeight.w900,
           color: AppColor.text,
-          fontWeight: FontWeight.w600,
         ),
-        cursorColor: AppColor.primary,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: AppColor.textMuted.withOpacity(0.8),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppColor.border,
           ),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         ),
-      ),
+      ],
     );
   }
 }

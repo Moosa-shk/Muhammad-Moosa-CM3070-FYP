@@ -1,5 +1,7 @@
 // lib/widgets/sos_bottom_sheet.dart
+
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -28,13 +30,18 @@ class SosBottomSheet extends StatefulWidget {
 class _SosBottomSheetState extends State<SosBottomSheet>
     with SingleTickerProviderStateMixin {
   bool _busy = false;
+
   EmergencyType _type = EmergencyType.medical;
-  final TextEditingController _noteC = TextEditingController();
+
+  final TextEditingController _noteC =
+      TextEditingController();
+
   late final AnimationController _pulseCtrl;
 
   @override
   void initState() {
     super.initState();
+
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -48,7 +55,13 @@ class _SosBottomSheetState extends State<SosBottomSheet>
     super.dispose();
   }
 
-  Future<SosPayload> _payload({required bool tryLocation}) {
+  // ===============================================================
+  // EXISTING SOS LOGIC
+  // ===============================================================
+
+  Future<SosPayload> _payload({
+    required bool tryLocation,
+  }) {
     return SosService.buildPayload(
       userName: widget.userName,
       type: _type,
@@ -58,7 +71,9 @@ class _SosBottomSheetState extends State<SosBottomSheet>
   }
 
   Future<void> _openSimulatorTestMode() async {
-    final payload = await _payload(tryLocation: false);
+    final payload = await _payload(
+      tryLocation: false,
+    );
 
     if (!mounted) return;
 
@@ -80,23 +95,37 @@ class _SosBottomSheetState extends State<SosBottomSheet>
 
   Future<void> _sendSmsComposer() async {
     if (_busy) return;
-    setState(() => _busy = true);
+
+    setState(() {
+      _busy = true;
+    });
 
     try {
-      final physical = await SosService.isPhysicalDevice();
+      final physical =
+          await SosService.isPhysicalDevice();
+
       if (!physical) {
         await _openSimulatorTestMode();
         return;
       }
 
-      final payload = await _payload(tryLocation: true);
+      final payload = await _payload(
+        tryLocation: true,
+      );
 
-      final controller = TextEditingController(text: payload.message);
+      final controller = TextEditingController(
+        text: payload.message,
+      );
+
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
           backgroundColor: AppColor.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('Send SOS SMS'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Text(
+            'Send SOS SMS',
+          ),
           content: TextField(
             controller: controller,
             maxLines: 7,
@@ -105,29 +134,42 @@ class _SosBottomSheetState extends State<SosBottomSheet>
               filled: true,
               fillColor: AppColor.inputFill,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: AppColor.borderStrong),
+                borderRadius:
+                    BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: AppColor.borderStrong,
+                ),
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancel'),
+              onPressed: () =>
+                  Get.back(result: false),
+              child: const Text(
+                'Cancel',
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.primary,
-                foregroundColor: Colors.white,
+                backgroundColor:
+                    AppColor.primary,
+                foregroundColor:
+                    Colors.white,
               ),
-              onPressed: () => Get.back(result: true),
-              child: const Text('Open SMS'),
+              onPressed: () =>
+                  Get.back(result: true),
+              child: const Text(
+                'Open SMS',
+              ),
             ),
           ],
         ),
       );
 
-      if (confirmed != true) return;
+      if (confirmed != true) {
+        return;
+      }
 
       await SosService.openSmsComposer(
         phone: widget.emergencyContact,
@@ -140,22 +182,39 @@ class _SosBottomSheetState extends State<SosBottomSheet>
         channel: 'SMS',
         emergency: widget.emergencyContact,
       );
-      await LocalNotificationService.sosOpened(channel: 'SMS Composer');
+
+      await LocalNotificationService.sosOpened(
+        channel: 'SMS Composer',
+      );
     } catch (e) {
-      await LocalNotificationService.sosFailed(e.toString());
-      PopupUtils.warning('SOS', e.toString());
+      await LocalNotificationService.sosFailed(
+        e.toString(),
+      );
+
+      PopupUtils.warning(
+        'SOS',
+        e.toString(),
+      );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
   Future<void> _sendWhatsApp() async {
     if (_busy) return;
-    setState(() => _busy = true);
+
+    setState(() {
+      _busy = true;
+    });
 
     try {
       final payload = await _payload(
-        tryLocation: await SosService.isPhysicalDevice(),
+        tryLocation:
+            await SosService.isPhysicalDevice(),
       );
 
       await SosService.openWhatsApp(
@@ -167,21 +226,39 @@ class _SosBottomSheetState extends State<SosBottomSheet>
         channel: 'WhatsApp',
         emergency: widget.emergencyContact,
       );
-      await LocalNotificationService.sosOpened(channel: 'WhatsApp');
+
+      await LocalNotificationService.sosOpened(
+        channel: 'WhatsApp',
+      );
     } catch (e) {
-      await LocalNotificationService.sosFailed(e.toString());
-      PopupUtils.warning('WhatsApp', e.toString());
+      await LocalNotificationService.sosFailed(
+        e.toString(),
+      );
+
+      PopupUtils.warning(
+        'WhatsApp',
+        e.toString(),
+      );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
   Future<void> _sendDirectSmsAndroid() async {
     if (_busy) return;
-    setState(() => _busy = true);
+
+    setState(() {
+      _busy = true;
+    });
 
     try {
-      final physical = await SosService.isPhysicalDevice();
+      final physical =
+          await SosService.isPhysicalDevice();
+
       if (!physical) {
         await _openSimulatorTestMode();
         return;
@@ -189,38 +266,56 @@ class _SosBottomSheetState extends State<SosBottomSheet>
 
       if (!Platform.isAndroid) {
         PopupUtils.warning(
-            'Direct SMS', 'Android-only. Use SMS Composer on iOS.');
+          'Direct SMS',
+          'Android-only. Use SMS Composer on iOS.',
+        );
         return;
       }
 
-      final payload = await _payload(tryLocation: true);
+      final payload = await _payload(
+        tryLocation: true,
+      );
 
       final confirmed = await Get.dialog<bool>(
         AlertDialog(
           backgroundColor: AppColor.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('Send Direct SMS (Android)'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Text(
+            'Send Direct SMS (Android)',
+          ),
           content: const Text(
             'This will send SMS directly without opening Messages.\n\nProceed?',
           ),
           actions: [
             TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancel'),
+              onPressed: () =>
+                  Get.back(result: false),
+              child: const Text(
+                'Cancel',
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.primary,
-                foregroundColor: Colors.white,
+                backgroundColor:
+                    AppColor.primary,
+                foregroundColor:
+                    Colors.white,
               ),
-              onPressed: () => Get.back(result: true),
-              child: const Text('Send'),
+              onPressed: () =>
+                  Get.back(result: true),
+              child: const Text(
+                'Send',
+              ),
             ),
           ],
         ),
       );
 
-      if (confirmed != true) return;
+      if (confirmed != true) {
+        return;
+      }
 
       try {
         await SosService.sendDirectSmsAndroid(
@@ -228,340 +323,885 @@ class _SosBottomSheetState extends State<SosBottomSheet>
           message: payload.message,
         );
 
-        await LocalNotificationService.sosSentAndroidDirect();
+        await LocalNotificationService
+            .sosSentAndroidDirect();
       } catch (e) {
         await LocalNotificationService.sosFailed(
           'Direct SMS failed/denied. Opening composer...',
         );
+
         await SosService.openSmsComposer(
           phone: widget.emergencyContact,
           message: payload.message,
         );
-        await LocalNotificationService.sosOpened(channel: 'SMS Composer');
+
+        await LocalNotificationService.sosOpened(
+          channel: 'SMS Composer',
+        );
       }
     } catch (e) {
-      await LocalNotificationService.sosFailed(e.toString());
-      PopupUtils.warning('Direct SMS', e.toString());
+      await LocalNotificationService.sosFailed(
+        e.toString(),
+      );
+
+      PopupUtils.warning(
+        'Direct SMS',
+        e.toString(),
+      );
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
   Future<void> _call() async {
     try {
-      await SosService.callEmergency(widget.emergencyContact);
+      await SosService.callEmergency(
+        widget.emergencyContact,
+      );
 
       await LocalNotificationService.sosPrepared(
         channel: 'Call',
         emergency: widget.emergencyContact,
       );
-      await LocalNotificationService.sosOpened(channel: 'Dialer');
+
+      await LocalNotificationService.sosOpened(
+        channel: 'Dialer',
+      );
     } catch (e) {
-      await LocalNotificationService.sosFailed(e.toString());
-      PopupUtils.warning('Call', e.toString());
+      await LocalNotificationService.sosFailed(
+        e.toString(),
+      );
+
+      PopupUtils.warning(
+        'Call',
+        e.toString(),
+      );
     }
   }
 
-  // ================= UI HELPERS =================
+  // ===============================================================
+  // UI
+  // ===============================================================
 
-  Widget _chip(EmergencyType t) {
-    final selected = _type == t;
+  @override
+  Widget build(BuildContext context) {
+    final keyboard =
+        MediaQuery.of(context).viewInsets.bottom;
 
-    return GestureDetector(
-      onTap: () => setState(() => _type = t),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColor.primary : AppColor.cardFill,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? Colors.transparent : AppColor.borderStrong,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColor.primary.withOpacity(0.22),
-                    blurRadius: 14,
-                    offset: const Offset(0, 10),
-                  )
-                ]
-              : [
-                  BoxShadow(
-                    color: AppColor.shadow,
-                    blurRadius: 10,
-                    offset: const Offset(0, 8),
-                  )
-                ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: keyboard,
         ),
-        child: TextWidget(
-          t.label,
-          size: 13,
-          weight: FontWeight.w800,
-          color: selected ? Colors.white : AppColor.secondary,
-        ),
-      ),
-    );
-  }
-
-  Widget _actionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    bool primary = false,
-  }) {
-    return GestureDetector(
-      onTap: _busy ? null : onTap,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: _busy ? 0.6 : 1,
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: primary ? AppColor.primary : AppColor.cardFill,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: primary ? Colors.transparent : AppColor.border,
+          decoration: const BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(30),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: primary
-                    ? AppColor.primary.withOpacity(0.22)
-                    : AppColor.shadow,
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              )
-            ],
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: primary
-                      ? Colors.white.withOpacity(0.18)
-                      : AppColor.primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: primary
-                        ? Colors.white.withOpacity(0.18)
-                        : AppColor.primary.withOpacity(0.15),
+          child: SingleChildScrollView(
+            physics:
+                const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                // -------------------------------------------------
+                // HANDLE
+                // -------------------------------------------------
+
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColor.borderStrong,
+                      borderRadius:
+                          BorderRadius.circular(99),
+                    ),
                   ),
                 ),
-                child: Icon(
-                  icon,
-                  color: primary ? Colors.white : AppColor.primary,
+
+                const SizedBox(height: 18),
+
+                // -------------------------------------------------
+                // HEADER
+                // -------------------------------------------------
+
+                _header(),
+
+                const SizedBox(height: 22),
+
+                // -------------------------------------------------
+                // TYPE
+                // -------------------------------------------------
+
+                const TextWidget(
+                  'What happened?',
+                  size: 14,
+                  weight: FontWeight.w900,
+                  color: AppColor.text,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                const SizedBox(height: 4),
+
+                const TextWidget(
+                  'Choose the closest emergency type',
+                  size: 11,
+                  color: AppColor.textMuted,
+                ),
+
+                const SizedBox(height: 12),
+
+                Row(
                   children: [
-                    TextWidget(
-                      title,
-                      weight: FontWeight.w900,
-                      size: 15,
-                      color: primary ? Colors.white : AppColor.secondary,
+                    Expanded(
+                      child: _typeCard(
+                        EmergencyType.medical,
+                        Icons.medical_services_outlined,
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    TextWidget(
-                      subtitle,
-                      size: 12,
-                      color: primary ? Colors.white70 : AppColor.textMuted,
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: _typeCard(
+                        EmergencyType.fire,
+                        Icons.local_fire_department_outlined,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              if (_busy && primary)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                Icon(
-                  Icons.chevron_right,
-                  color: primary
-                      ? Colors.white.withOpacity(0.9)
-                      : AppColor.textMuted.withOpacity(0.7),
+
+                const SizedBox(height: 10),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _typeCard(
+                        EmergencyType.flood,
+                        Icons.water_outlined,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: _typeCard(
+                        EmergencyType.other,
+                        Icons.emergency_outlined,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+
+                const SizedBox(height: 20),
+
+                // -------------------------------------------------
+                // NOTE
+                // -------------------------------------------------
+
+                _noteField(),
+
+                const SizedBox(height: 20),
+
+                // -------------------------------------------------
+                // PRIMARY ACTION
+                // -------------------------------------------------
+
+                _mainSmsAction(),
+
+                const SizedBox(height: 12),
+
+                // -------------------------------------------------
+                // SECONDARY ACTIONS
+                // -------------------------------------------------
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _compactAction(
+                        icon:
+                            FontAwesomeIcons.whatsapp,
+                        title: 'WhatsApp',
+                        color:
+                            const Color(0xFF1FAF64),
+                        onTap: _sendWhatsApp,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: _compactAction(
+                        icon: Icons.send_outlined,
+                        title: 'Direct SMS',
+                        color:
+                            AppColor.secondary,
+                        onTap:
+                            _sendDirectSmsAndroid,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // -------------------------------------------------
+                // CALL
+                // -------------------------------------------------
+
+                _callAction(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  // ===============================================================
+  // HEADER
+  // ===============================================================
+
   Widget _header() {
     return Row(
+      crossAxisAlignment:
+          CrossAxisAlignment.center,
       children: [
         AnimatedBuilder(
           animation: _pulseCtrl,
           builder: (_, __) {
-            final v = 1.0 + (_pulseCtrl.value * 0.10);
+            final scale =
+                1 + (_pulseCtrl.value * 0.04);
+
             return Transform.scale(
-              scale: v,
+              scale: scale,
               child: Container(
-                width: 54,
-                height: 54,
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
-                  color: AppColor.primary.withOpacity(0.14),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColor.primary.withOpacity(0.18),
-                  ),
+                  color:
+                      AppColor.primary,
+                  borderRadius:
+                      BorderRadius.circular(19),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.primary
+                          .withOpacity(0.22),
+                      blurRadius: 18,
+                      offset:
+                          const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.sos_rounded,
-                  color: AppColor.primary,
-                  size: 30,
+                  color: Colors.white,
+                  size: 29,
                 ),
               ),
             );
           },
         ),
-        const SizedBox(width: 12),
+
+        const SizedBox(width: 14),
+
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
-              const TextWidget('SOS Emergency', weight: FontWeight.w900, size: 18),
-              TextWidget(
-                'Contact: ${widget.emergencyContact}',
-                size: 12,
-                color: AppColor.textMuted,
+              const TextWidget(
+                'Emergency SOS',
+                size: 19,
+                weight: FontWeight.w900,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 5),
+
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.inputFill,
+                  borderRadius:
+                      BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize:
+                      MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.person_outline_rounded,
+                      size: 13,
+                      color:
+                          AppColor.textMuted,
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: TextWidget(
+                        widget.emergencyContact,
+                        size: 10.5,
+                        weight:
+                            FontWeight.w800,
+                        color:
+                            AppColor.textMuted,
+                        maxLines: 1,
+                        overflow:
+                            TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => Get.back(),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColor.cardFill,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColor.border),
+
+        const SizedBox(width: 12),
+
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Get.back(),
+            borderRadius:
+                BorderRadius.circular(14),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColor.inputFill,
+                borderRadius:
+                    BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColor.border,
+                ),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: AppColor.text,
+              ),
             ),
-            child: const Icon(Icons.close, color: AppColor.secondary),
           ),
         ),
       ],
     );
   }
 
-  Widget _noteField() {
-    return TextField(
-      controller: _noteC,
-      maxLines: 2,
-      decoration: InputDecoration(
-        hintText: 'Optional note (e.g., “I am injured”, “Need rescue”)',
-        hintStyle: TextStyle(color: AppColor.textMuted.withOpacity(0.85)),
-        filled: true,
-        fillColor: AppColor.inputFill,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColor.borderStrong),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColor.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColor.primary.withOpacity(0.5), width: 1.6),
+  // ===============================================================
+  // EMERGENCY TYPE
+  // ===============================================================
+
+  Widget _typeCard(
+    EmergencyType type,
+    IconData icon,
+  ) {
+    final selected =
+        _type == type;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _type = type;
+          });
+        },
+        borderRadius:
+            BorderRadius.circular(17),
+        child: AnimatedContainer(
+          duration:
+              const Duration(milliseconds: 200),
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 13,
+            vertical: 13,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColor.secondary
+                : AppColor.surface,
+            borderRadius:
+                BorderRadius.circular(17),
+            border: Border.all(
+              color: selected
+                  ? AppColor.secondary
+                  : AppColor.border,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColor.secondary
+                          .withOpacity(0.13),
+                      blurRadius: 12,
+                      offset:
+                          const Offset(0, 6),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 37,
+                height: 37,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white
+                          .withOpacity(0.10)
+                      : AppColor.inputFill,
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 19,
+                  color: selected
+                      ? Colors.white
+                      : AppColor.primary,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: TextWidget(
+                  type.label,
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: selected
+                      ? Colors.white
+                      : AppColor.text,
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                ),
+              ),
+
+              AnimatedContainer(
+                duration: const Duration(
+                  milliseconds: 180,
+                ),
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColor.primary
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected
+                        ? AppColor.primary
+                        : AppColor.borderStrong,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        decoration: BoxDecoration(
-          color: AppColor.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          border: Border.all(color: AppColor.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 28,
-              offset: const Offset(0, -10),
-            ),
-          ],
+  // ===============================================================
+  // NOTE
+  // ===============================================================
+
+  Widget _noteField() {
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        const TextWidget(
+          'Add a note',
+          size: 14,
+          weight: FontWeight.w900,
+          color: AppColor.text,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+
+        const SizedBox(height: 4),
+
+        const TextWidget(
+          'Optional — include anything the contact should know',
+          size: 11,
+          color: AppColor.textMuted,
+        ),
+
+        const SizedBox(height: 10),
+
+        TextField(
+          controller: _noteC,
+          maxLines: 2,
+          minLines: 2,
+          cursorColor: AppColor.primary,
+          style: const TextStyle(
+            color: AppColor.text,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+          decoration: InputDecoration(
+            hintText:
+                'Example: I am injured and need help...',
+            hintStyle: TextStyle(
+              color: AppColor.textMuted
+                  .withOpacity(0.72),
+              fontWeight: FontWeight.w500,
+            ),
+            filled: true,
+            fillColor: AppColor.inputFill,
+            prefixIcon: const Padding(
+              padding: EdgeInsets.only(
+                left: 14,
+                right: 10,
+                bottom: 30,
+              ),
+              child: Icon(
+                Icons.notes_rounded,
+                color: AppColor.textMuted,
+                size: 19,
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: AppColor.border,
+              ),
+            ),
+            enabledBorder:
+                OutlineInputBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: AppColor.border,
+              ),
+            ),
+            focusedBorder:
+                OutlineInputBorder(
+              borderRadius:
+                  BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: AppColor.primary
+                    .withOpacity(0.45),
+                width: 1.3,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===============================================================
+  // MAIN SMS ACTION
+  // ===============================================================
+
+  Widget _mainSmsAction() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap:
+            _busy ? null : _sendSmsComposer,
+        borderRadius:
+            BorderRadius.circular(20),
+        child: AnimatedOpacity(
+          duration:
+              const Duration(milliseconds: 180),
+          opacity: _busy ? 0.65 : 1,
+          child: Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            decoration: BoxDecoration(
+              color: AppColor.primary,
+              borderRadius:
+                  BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColor.primary
+                      .withOpacity(0.22),
+                  blurRadius: 18,
+                  offset:
+                      const Offset(0, 9),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white
+                        .withOpacity(0.14),
+                    borderRadius:
+                        BorderRadius.circular(15),
+                  ),
+                  child: const Icon(
+                    Icons.message_outlined,
+                    color: Colors.white,
+                    size: 23,
+                  ),
+                ),
+
+                const SizedBox(width: 13),
+
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        'Send SOS message',
+                        size: 15,
+                        weight:
+                            FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                      SizedBox(height: 3),
+                      TextWidget(
+                        'Opens SMS with your emergency details',
+                        size: 10.5,
+                        color:
+                            Color(0xD9FFFFFF),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_busy)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  Container(
+                    width: 35,
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withOpacity(0.13),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // COMPACT SECONDARY ACTION
+  // ===============================================================
+
+  Widget _compactAction({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _busy ? null : onTap,
+        borderRadius:
+            BorderRadius.circular(18),
+        child: AnimatedOpacity(
+          duration:
+              const Duration(milliseconds: 180),
+          opacity: _busy ? 0.55 : 1,
+          child: Container(
+            height: 104,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius:
+                  BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColor.border,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color
+                            .withOpacity(0.09),
+                        borderRadius:
+                            BorderRadius.circular(
+                          12,
+                        ),
+                      ),
+                      child: Center(
+                        child: icon ==
+                                FontAwesomeIcons
+                                    .whatsapp
+                            ? FaIcon(
+                                icon,
+                                size: 19,
+                                color: color,
+                              )
+                            : Icon(
+                                icon,
+                                size: 20,
+                                color: color,
+                              ),
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    const Icon(
+                      Icons
+                          .north_east_rounded,
+                      size: 17,
+                      color:
+                          AppColor.textMuted,
+                    ),
+                  ],
+                ),
+
+                const Spacer(),
+
+                TextWidget(
+                  title,
+                  size: 12,
+                  weight: FontWeight.w800,
+                  color: AppColor.text,
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // CALL ACTION
+  // ===============================================================
+
+  Widget _callAction() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _busy ? null : _call,
+        borderRadius:
+            BorderRadius.circular(18),
+        child: Container(
+          width: double.infinity,
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 15,
+            vertical: 14,
+          ),
+          decoration: BoxDecoration(
+            color:
+                AppColor.danger.withOpacity(0.07),
+            borderRadius:
+                BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColor.danger
+                  .withOpacity(0.14),
+            ),
+          ),
+          child: Row(
             children: [
               Container(
-                width: 46,
-                height: 5,
-                margin: const EdgeInsets.only(bottom: 10),
+                width: 43,
+                height: 43,
                 decoration: BoxDecoration(
-                  color: AppColor.borderStrong,
-                  borderRadius: BorderRadius.circular(999),
+                  color: AppColor.danger
+                      .withOpacity(0.11),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.call_rounded,
+                  color: AppColor.danger,
+                  size: 21,
                 ),
               ),
-              _header(),
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextWidget(
-                  'Emergency Type',
-                  weight: FontWeight.w900,
-                  size: 14,
-                  color: AppColor.secondary,
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    const TextWidget(
+                      'Call emergency contact',
+                      size: 13.5,
+                      weight:
+                          FontWeight.w900,
+                      color: AppColor.text,
+                    ),
+                    const SizedBox(height: 2),
+                    TextWidget(
+                      widget.emergencyContact,
+                      size: 11,
+                      weight:
+                          FontWeight.w700,
+                      color: AppColor.danger,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _chip(EmergencyType.medical),
-                  _chip(EmergencyType.fire),
-                  _chip(EmergencyType.flood),
-                   _chip(EmergencyType.other),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _noteField(),
-              const SizedBox(height: 14),
-              _actionCard(
-                icon: Icons.sms_rounded,
-                title: 'SIM SMS (Composer)',
-                subtitle: 'Opens SMS app with full SOS message',
-                onTap: _sendSmsComposer,
-                primary: true,
-              ),
-              const SizedBox(height: 12),
-              _actionCard(
-                icon: FontAwesomeIcons.whatsapp,
-                title: 'WhatsApp Message',
-                subtitle: 'Opens WhatsApp chat with prefilled SOS message',
-                onTap: _sendWhatsApp,
-              ),
-              const SizedBox(height: 12),
-              _actionCard(
-                icon: Icons.send_rounded,
-                title: 'Direct SMS (Android)',
-                subtitle: 'Sends instantly (permission). Falls back to composer.',
-                onTap: _sendDirectSmsAndroid,
-              ),
-              const SizedBox(height: 12),
-              _actionCard(
-                icon: Icons.call_rounded,
-                title: 'Call Emergency Contact',
-                subtitle: 'Opens dialer for immediate call',
-                onTap: _call,
+
+              const Icon(
+                Icons.call_made_rounded,
+                color: AppColor.danger,
+                size: 19,
               ),
             ],
           ),
@@ -571,7 +1211,9 @@ class _SosBottomSheetState extends State<SosBottomSheet>
   }
 }
 
-// ================= TEST PANEL (same logic, tokenized UI) =================
+// =================================================================
+// SIMULATOR TEST PANEL
+// =================================================================
 
 class _SosTestPanel extends StatefulWidget {
   const _SosTestPanel({
@@ -585,21 +1227,30 @@ class _SosTestPanel extends StatefulWidget {
   final SosPayload initialPayload;
 
   @override
-  State<_SosTestPanel> createState() => _SosTestPanelState();
+  State<_SosTestPanel> createState() =>
+      _SosTestPanelState();
 }
 
-class _SosTestPanelState extends State<_SosTestPanel> {
+class _SosTestPanelState
+    extends State<_SosTestPanel> {
   late SosPayload _payload;
+
   bool _fetching = false;
+
   String? _status;
 
-  final _latC = TextEditingController();
-  final _lngC = TextEditingController();
+  final _latC =
+      TextEditingController();
+
+  final _lngC =
+      TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _payload = widget.initialPayload;
+
+    _payload =
+        widget.initialPayload;
   }
 
   @override
@@ -609,276 +1260,832 @@ class _SosTestPanelState extends State<_SosTestPanel> {
     super.dispose();
   }
 
-  String _messageWithLink(String link) {
+  // ===============================================================
+  // ORIGINAL TEST LOGIC PRESERVED
+  // ===============================================================
+
+  String _messageWithLink(
+    String link,
+  ) {
     final msg = _payload.message;
-    final lines = msg.split('\n');
-    final idx = lines.indexWhere((l) => l.trim().startsWith('My location:'));
+
+    final lines =
+        msg.split('\n');
+
+    final idx = lines.indexWhere(
+      (l) =>
+          l.trim().startsWith(
+            'My location:',
+          ),
+    );
+
     if (idx >= 0) {
-      lines[idx] = 'My location: $link';
-      return lines.join('\n').trim();
+      lines[idx] =
+          'My location: $link';
+
+      return lines
+          .join('\n')
+          .trim();
     }
-    return '$msg\n\nMy location: $link'.trim();
+
+    return '$msg\n\nMy location: $link'
+        .trim();
   }
 
-  bool _validLatLng(double lat, double lng) =>
-      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  bool _validLatLng(
+    double lat,
+    double lng,
+  ) {
+    return lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180;
+  }
 
   Future<void> _fetchLocation() async {
     if (_fetching) return;
+
     setState(() {
       _fetching = true;
       _status = null;
     });
 
     try {
-      final link = await SosService.fetchMapsLink();
+      final link =
+          await SosService.fetchMapsLink();
+
       if (link == null) {
         setState(() {
-          _status = 'Timed out. Use Manual Lat/Lng below (demo-safe).';
+          _status =
+              'Timed out. Use Manual Lat/Lng below (demo-safe).';
         });
-        PopupUtils.warning('Location', _status!);
+
+        PopupUtils.warning(
+          'Location',
+          _status!,
+        );
+
         return;
       }
 
       setState(() {
-        _payload = _payload.copyWith(
+        _payload =
+            _payload.copyWith(
           mapsLink: link,
-          message: _messageWithLink(link),
+          message:
+              _messageWithLink(link),
         );
-        _status = 'Location attached ✅';
+
+        _status =
+            'Location attached ✅';
       });
 
-      PopupUtils.success('Location', 'Location attached ✅');
+      PopupUtils.success(
+        'Location',
+        'Location attached ✅',
+      );
     } catch (e) {
-      setState(() => _status = 'Error: $e');
-      PopupUtils.warning('Location', e.toString());
+      setState(() {
+        _status =
+            'Error: $e';
+      });
+
+      PopupUtils.warning(
+        'Location',
+        e.toString(),
+      );
     } finally {
-      if (mounted) setState(() => _fetching = false);
+      if (mounted) {
+        setState(() {
+          _fetching = false;
+        });
+      }
     }
   }
 
   void _attachManualLocation() {
-    final lat = double.tryParse(_latC.text.trim());
-    final lng = double.tryParse(_lngC.text.trim());
+    final lat =
+        double.tryParse(
+      _latC.text.trim(),
+    );
 
-    if (lat == null || lng == null) {
-      PopupUtils.warning('Manual Location', 'Enter valid numbers for lat/lng.');
+    final lng =
+        double.tryParse(
+      _lngC.text.trim(),
+    );
+
+    if (lat == null ||
+        lng == null) {
+      PopupUtils.warning(
+        'Manual Location',
+        'Enter valid numbers for lat/lng.',
+      );
       return;
     }
-    if (!_validLatLng(lat, lng)) {
-      PopupUtils.warning('Manual Location', 'Lat/Lng out of range.');
+
+    if (!_validLatLng(
+      lat,
+      lng,
+    )) {
+      PopupUtils.warning(
+        'Manual Location',
+        'Lat/Lng out of range.',
+      );
       return;
     }
 
-    final link = SosService.mapsLink(lat, lng);
+    final link =
+        SosService.mapsLink(
+      lat,
+      lng,
+    );
 
     setState(() {
-      _payload = _payload.copyWith(
+      _payload =
+          _payload.copyWith(
         mapsLink: link,
-        message: _messageWithLink(link),
+        message:
+            _messageWithLink(link),
       );
-      _status = 'Manual location attached ✅';
+
+      _status =
+          'Manual location attached ✅';
     });
 
-    PopupUtils.success('Manual Location', 'Attached ✅');
+    PopupUtils.success(
+      'Manual Location',
+      'Attached ✅',
+    );
   }
+
+  // ===============================================================
+  // BUILD
+  // ===============================================================
 
   @override
   Widget build(BuildContext context) {
+    final hasLocation =
+        _payload.mapsLink != null;
+
     return SafeArea(
+      top: false,
       child: Container(
-        margin: const EdgeInsets.only(top: 80),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
+        margin: const EdgeInsets.only(
+          top: 70,
+        ),
+        decoration: const BoxDecoration(
           color: AppColor.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          border: Border.all(color: AppColor.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.16),
-              blurRadius: 28,
-              offset: const Offset(0, -10),
-            ),
-          ],
+          borderRadius:
+              BorderRadius.vertical(
+            top: Radius.circular(30),
+          ),
         ),
         child: SingleChildScrollView(
+          physics:
+              const BouncingScrollPhysics(),
+          padding:
+              const EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            24,
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                MainAxisSize.min,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: TextWidget(
-                      'Simulator Test Mode',
-                      weight: FontWeight.w900,
-                      size: 16,
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color:
+                        AppColor.borderStrong,
+                    borderRadius:
+                        BorderRadius.circular(
+                      99,
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close, color: AppColor.secondary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              TextWidget('To: ${widget.emergency}',
-                  size: 12, color: AppColor.textMuted),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColor.inputFill,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColor.border),
-                ),
-                child: Text(
-                  _payload.message,
-                  style: const TextStyle(fontSize: 13, height: 1.25),
                 ),
               ),
-              const SizedBox(height: 12),
+
+              const SizedBox(height: 18),
+
+              // ---------------------------------------------------
+              // HEADER
+              // ---------------------------------------------------
+
               Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.primary,
-                        foregroundColor: Colors.white,
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          AppColor.secondary,
+                      borderRadius:
+                          BorderRadius.circular(
+                        16,
                       ),
-                      onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(text: _payload.message),
-                        );
-                        PopupUtils.success('Copied', 'SOS message copied');
-                      },
-                      icon: const Icon(Icons.copy),
-                      label: const Text('Copy Message'),
+                    ),
+                    child: const Icon(
+                      Icons
+                          .science_outlined,
+                      color: Colors.white,
+                      size: 23,
                     ),
                   ),
-                  const SizedBox(width: 10),
+
+                  const SizedBox(
+                    width: 12,
+                  ),
+
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _payload.mapsLink == null
-                          ? null
-                          : () async {
-                              try {
-                                await SosService.openMapsLink(_payload.mapsLink!);
-                              } catch (e) {
-                                PopupUtils.warning('Maps', e.toString());
-                              }
-                            },
-                      icon: const Icon(Icons.map),
-                      label: const Text('Open Maps'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _fetching ? null : _fetchLocation,
-                  icon: _fetching
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location),
-                  label: Text(_fetching ? 'Fetching...' : 'Fetch Location (Auto)'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColor.cardFill,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColor.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const TextWidget(
-                      'Manual Location (Demo-safe)',
-                      weight: FontWeight.w900,
-                      size: 14,
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _latC,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: 'Latitude',
-                              filled: true,
-                              fillColor: AppColor.inputFill,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
+                        const TextWidget(
+                          'Simulator Test Mode',
+                          size: 17,
+                          weight:
+                              FontWeight.w900,
+                          color:
+                              AppColor.text,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _lngC,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                              signed: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: 'Longitude',
-                              filled: true,
-                              fillColor: AppColor.inputFill,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
+
+                        const SizedBox(
+                          height: 3,
+                        ),
+
+                        TextWidget(
+                          'Emergency: ${widget.emergency}',
+                          size: 10.5,
+                          color: AppColor
+                              .textMuted,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _attachManualLocation,
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: const Text('Attach Manual Location'),
+                  ),
+
+                  IconButton(
+                    onPressed: () =>
+                        Get.back(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color:
+                          AppColor.text,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // ---------------------------------------------------
+              // MESSAGE PREVIEW
+              // ---------------------------------------------------
+
+              const TextWidget(
+                'SOS Preview',
+                size: 13,
+                weight: FontWeight.w900,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 9),
+
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.all(
+                  15,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      AppColor.inputFill,
+                  borderRadius:
+                      BorderRadius.circular(
+                    17,
+                  ),
+                  border: Border.all(
+                    color:
+                        AppColor.border,
+                  ),
+                ),
+                child: Text(
+                  _payload.message,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color:
+                        AppColor.text,
+                    fontWeight:
+                        FontWeight.w500,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ---------------------------------------------------
+              // MESSAGE ACTIONS
+              // ---------------------------------------------------
+
+              Row(
+                children: [
+                  Expanded(
+                    child:
+                        _testButton(
+                      icon:
+                          Icons.copy_rounded,
+                      title:
+                          'Copy Message',
+                      filled: true,
+                      onTap:
+                          () async {
+                        await Clipboard
+                            .setData(
+                          ClipboardData(
+                            text: _payload
+                                .message,
+                          ),
+                        );
+
+                        PopupUtils
+                            .success(
+                          'Copied',
+                          'SOS message copied',
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child:
+                        _testButton(
+                      icon: Icons
+                          .map_outlined,
+                      title: 'Open Maps',
+                      filled: false,
+                      onTap:
+                          hasLocation
+                              ? () async {
+                                  try {
+                                    await SosService
+                                        .openMapsLink(
+                                      _payload
+                                          .mapsLink!,
+                                    );
+                                  } catch (e) {
+                                    PopupUtils
+                                        .warning(
+                                      'Maps',
+                                      e.toString(),
+                                    );
+                                  }
+                                }
+                              : null,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // ---------------------------------------------------
+              // AUTO LOCATION
+              // ---------------------------------------------------
+
+              Material(
+                color:
+                    Colors.transparent,
+                child: InkWell(
+                  onTap: _fetching
+                      ? null
+                      : _fetchLocation,
+                  borderRadius:
+                      BorderRadius.circular(
+                    17,
+                  ),
+                  child: Container(
+                    width:
+                        double.infinity,
+                    padding:
+                        const EdgeInsets
+                            .symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          AppColor.surface,
+                      borderRadius:
+                          BorderRadius.circular(
+                        17,
+                      ),
+                      border:
+                          Border.all(
+                        color:
+                            AppColor.border,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    TextWidget(
-                      'Example (Faisalabad): 31.418000 , 73.079100',
-                      size: 12,
-                      color: AppColor.textMuted,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration:
+                              BoxDecoration(
+                            color: AppColor
+                                .primary
+                                .withOpacity(
+                              0.09,
+                            ),
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              13,
+                            ),
+                          ),
+                          child: _fetching
+                              ? const Padding(
+                                  padding:
+                                      EdgeInsets.all(
+                                    11,
+                                  ),
+                                  child:
+                                      CircularProgressIndicator(
+                                    strokeWidth:
+                                        2,
+                                    color:
+                                        AppColor.primary,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons
+                                      .my_location_rounded,
+                                  color:
+                                      AppColor.primary,
+                                  size: 20,
+                                ),
+                        ),
+
+                        const SizedBox(
+                          width: 12,
+                        ),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                            children: [
+                              TextWidget(
+                                _fetching
+                                    ? 'Fetching location'
+                                    : 'Use current location',
+                                size: 12.5,
+                                weight:
+                                    FontWeight.w800,
+                                color:
+                                    AppColor.text,
+                              ),
+
+                              const SizedBox(
+                                height: 2,
+                              ),
+
+                              const TextWidget(
+                                'Attach location automatically',
+                                size: 10,
+                                color: AppColor
+                                    .textMuted,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const Icon(
+                          Icons
+                              .chevron_right_rounded,
+                          color: AppColor
+                              .textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // ---------------------------------------------------
+              // MANUAL LOCATION
+              // ---------------------------------------------------
+
+              const TextWidget(
+                'Manual Location',
+                size: 13,
+                weight:
+                    FontWeight.w900,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 4),
+
+              const TextWidget(
+                'Useful when simulator location is unavailable',
+                size: 10.5,
+                color:
+                    AppColor.textMuted,
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  Expanded(
+                    child:
+                        _coordinateField(
+                      controller:
+                          _latC,
+                      label:
+                          'Latitude',
+                    ),
+                  ),
+
+                  const SizedBox(
+                    width: 10,
+                  ),
+
+                  Expanded(
+                    child:
+                        _coordinateField(
+                      controller:
+                          _lngC,
+                      label:
+                          'Longitude',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child:
+                    OutlinedButton.icon(
+                  onPressed:
+                      _attachManualLocation,
+                  style:
+                      OutlinedButton.styleFrom(
+                    foregroundColor:
+                        AppColor.primary,
+                    side:
+                        const BorderSide(
+                      color:
+                          AppColor.borderStrong,
+                    ),
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(
+                        15,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons
+                        .add_location_alt_outlined,
+                    size: 19,
+                  ),
+                  label:
+                      const TextWidget(
+                    'Attach Coordinates',
+                    size: 12,
+                    weight:
+                        FontWeight.w800,
+                    color:
+                        AppColor.primary,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 9),
+
+              const TextWidget(
+                'Example: 31.418000, 73.079100',
+                size: 10,
+                color:
+                    AppColor.textMuted,
+              ),
+
+              const SizedBox(height: 16),
+
+              // ---------------------------------------------------
+              // LOCATION STATUS
+              // ---------------------------------------------------
+
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 11,
+                ),
+                decoration:
+                    BoxDecoration(
+                  color: hasLocation
+                      ? AppColor.safeGreen
+                          .withOpacity(0.07)
+                      : AppColor.danger
+                          .withOpacity(0.06),
+                  borderRadius:
+                      BorderRadius.circular(
+                    14,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasLocation
+                          ? Icons
+                              .check_circle_outline_rounded
+                          : Icons
+                              .location_off_outlined,
+                      size: 18,
+                      color: hasLocation
+                          ? AppColor.safeGreen
+                          : AppColor.danger,
+                    ),
+
+                    const SizedBox(
+                      width: 9,
+                    ),
+
+                    Expanded(
+                      child: TextWidget(
+                        _status ??
+                            (hasLocation
+                                ? 'Location attached'
+                                : 'Location not attached yet'),
+                        size: 10.5,
+                        weight:
+                            FontWeight.w700,
+                        color: hasLocation
+                            ? AppColor
+                                .safeGreen
+                            : AppColor
+                                .danger,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextWidget(
-                _status ??
-                    (_payload.mapsLink == null
-                        ? 'Location not attached yet.'
-                        : 'Location attached ✅'),
-                size: 12,
-                color: (_payload.mapsLink == null)
-                    ? AppColor.danger
-                    : AppColor.safeGreen,
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _coordinateField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType:
+          const TextInputType
+              .numberWithOptions(
+        decimal: true,
+        signed: true,
+      ),
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor:
+            AppColor.inputFill,
+        contentPadding:
+            const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 13,
+        ),
+        border:
+            OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+              const BorderSide(
+            color:
+                AppColor.border,
+          ),
+        ),
+        enabledBorder:
+            OutlineInputBorder(
+          borderRadius:
+              BorderRadius.circular(
+            14,
+          ),
+          borderSide:
+              const BorderSide(
+            color:
+                AppColor.border,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _testButton({
+    required IconData icon,
+    required String title,
+    required bool filled,
+    required VoidCallback? onTap,
+  }) {
+    return SizedBox(
+      height: 48,
+      child: filled
+          ? ElevatedButton.icon(
+              onPressed: onTap,
+              style:
+                  ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor:
+                    AppColor.primary,
+                foregroundColor:
+                    Colors.white,
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    15,
+                  ),
+                ),
+              ),
+              icon: Icon(
+                icon,
+                size: 18,
+              ),
+              label: Text(
+                title,
+                style:
+                    const TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+            )
+          : OutlinedButton.icon(
+              onPressed: onTap,
+              style:
+                  OutlinedButton.styleFrom(
+                foregroundColor:
+                    AppColor.text,
+                side:
+                    const BorderSide(
+                  color:
+                      AppColor.border,
+                ),
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    15,
+                  ),
+                ),
+              ),
+              icon: Icon(
+                icon,
+                size: 18,
+              ),
+              label: Text(
+                title,
+                style:
+                    const TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+            ),
     );
   }
 }

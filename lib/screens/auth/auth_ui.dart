@@ -1,115 +1,83 @@
-// ===============================================================
-// auth_ui.dart
-// ---------------------------------------------------------------
-// This file contains reusable UI components used in the
-// authentication screens of the application.
-//
-// The purpose of this file is to maintain consistent styling
-// across login and signup interfaces by centralizing the design
-// tokens and reusable widgets such as:
-// • Glass cards
-// • Input fields
-// • Primary buttons
-// • Dropdown selectors
-//
-// These widgets follow a modern "glass UI" design and are styled
-// using the application's primary color palette defined in
-// AppColor.
-// ===============================================================
+// lib/screens/auth/auth_ui.dart
 
-import 'dart:ui';
 import 'package:disaster_app_ui/config/colors.dart';
 import 'package:flutter/material.dart';
 
-
-// ===============================================================
-// AuthTokens
-// ---------------------------------------------------------------
-// This class contains centralized theme values used throughout
-// the authentication UI. These tokens help maintain consistency
-// in colors, borders, shadows, and text styling.
-// ===============================================================
+// =================================================================
+// AUTH TOKENS
+// =================================================================
 
 class AuthTokens {
   static const bool isLight = true;
 
-  /// Main text color
-  static const Color text = Color(0xFF1B1B1B);
+  static const Color text = AppColor.text;
+  static const Color textMuted = AppColor.textMuted;
 
-  /// Secondary muted text color
-  static const Color textMuted = Color(0xFF5A5A5A);
+  static const Color cardFill = AppColor.surface;
+  static const Color inputFill = AppColor.inputFill;
 
-  /// Glass card background
-  static const Color cardFill = Color(0xCCFFFFFF);
+  static const Color border = AppColor.border;
+  static const Color borderStrong = AppColor.borderStrong;
 
-  /// Text field background
-  static const Color inputFill = Color(0xE6FFFFFF);
-
-  /// Light border color
-  static const Color border = Color(0x1A000000);
-
-  /// Stronger border color
-  static const Color borderStrong = Color(0x26000000);
-
-  /// Default shadow
-  static Color shadow = Colors.black.withOpacity(0.10);
-
-  /// Hint text color
-  static Color hint = textMuted.withOpacity(0.85);
+  static Color shadow = AppColor.shadow;
+  static Color hint = AppColor.textMuted.withOpacity(0.72);
 }
 
-
-// ===============================================================
-// AuthGlassCard
-// ---------------------------------------------------------------
-// A reusable glass-style card used to wrap authentication forms.
-// It applies blur effects, soft shadows, and rounded corners to
-// achieve a modern frosted-glass UI appearance.
-// ===============================================================
+// =================================================================
+// AUTH CARD
+// =================================================================
 
 class AuthGlassCard extends StatelessWidget {
-  const AuthGlassCard({super.key, required this.child, this.padding});
+  const AuthGlassCard({
+    super.key,
+    required this.child,
+    this.padding,
+  });
 
   final Widget child;
   final EdgeInsets? padding;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AuthTokens.cardFill,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: AuthTokens.border),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 28,
-                offset: const Offset(0, 16),
-                color: AuthTokens.shadow,
-              )
-            ],
+    return Container(
+      width: double.infinity,
+
+      padding: padding ??
+          const EdgeInsets.fromLTRB(
+            18,
+            20,
+            18,
+            20,
           ),
-          child: child,
+
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+
+        borderRadius: BorderRadius.circular(24),
+
+        border: Border.all(
+          color: AppColor.border,
         ),
+
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.shadow,
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
+
+      child: child,
     );
   }
 }
 
+// =================================================================
+// AUTH FIELD
+// =================================================================
 
-// ===============================================================
-// AuthField
-// ---------------------------------------------------------------
-// A custom text field used in authentication forms such as
-// login and signup screens. It includes consistent styling,
-// icons, borders, and typography.
-// ===============================================================
-
-class AuthField extends StatelessWidget {
+class AuthField extends StatefulWidget {
   const AuthField({
     super.key,
     required this.controller,
@@ -124,68 +92,176 @@ class AuthField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
+
   final TextInputType? keyboardType;
   final bool obscureText;
+
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
 
   @override
-  Widget build(BuildContext context) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(18),
-      borderSide: const BorderSide(
-        color: AuthTokens.borderStrong,
-        width: 1,
-      ),
-    );
+  State<AuthField> createState() => _AuthFieldState();
+}
 
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      textInputAction: textInputAction,
-      onSubmitted: onSubmitted,
-      style: const TextStyle(
-        color: AuthTokens.text,
-        fontWeight: FontWeight.w700,
-        fontSize: 15,
+class _AuthFieldState extends State<AuthField> {
+  late bool _obscure;
+
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _obscure = widget.obscureText;
+
+    _focusNode.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = _focusNode.hasFocus;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+
+        borderRadius: BorderRadius.circular(17),
+
+        border: Border.all(
+          color: focused
+              ? AppColor.primary.withOpacity(0.55)
+              : AppColor.borderStrong,
+          width: focused ? 1.4 : 1,
+        ),
+
+        boxShadow: focused
+            ? [
+                BoxShadow(
+                  color: AppColor.primary.withOpacity(0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : [],
       ),
-      cursorColor: AppColor.primary,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(
-          color: AuthTokens.textMuted.withOpacity(0.85),
-          fontWeight: FontWeight.w600,
+
+      child: TextField(
+        controller: widget.controller,
+
+        focusNode: _focusNode,
+
+        keyboardType: widget.keyboardType,
+
+        obscureText: _obscure,
+
+        textInputAction: widget.textInputAction,
+
+        onSubmitted: widget.onSubmitted,
+
+        cursorColor: AppColor.primary,
+
+        style: const TextStyle(
+          color: AppColor.text,
+          fontSize: 14.5,
+          fontWeight: FontWeight.w700,
         ),
-        hintStyle: TextStyle(color: AuthTokens.hint),
-        prefixIcon: Icon(
-          icon,
-          color: AuthTokens.textMuted.withOpacity(0.80),
-        ),
-        filled: true,
-        fillColor: AuthTokens.inputFill,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-          borderSide: BorderSide(
-            color: AppColor.primary.withOpacity(0.65),
-            width: 1.4,
+
+        decoration: InputDecoration(
+          labelText: widget.label,
+
+          labelStyle: TextStyle(
+            color: focused
+                ? AppColor.primary
+                : AppColor.textMuted,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+
+          floatingLabelStyle: const TextStyle(
+            color: AppColor.primary,
+            fontWeight: FontWeight.w800,
+          ),
+
+          prefixIcon: Padding(
+            padding: const EdgeInsets.all(11),
+
+            child: Container(
+              width: 36,
+              height: 36,
+
+              decoration: BoxDecoration(
+                color: focused
+                    ? AppColor.primarySoft
+                    : AppColor.inputFill,
+
+                borderRadius: BorderRadius.circular(11),
+              ),
+
+              child: Icon(
+                widget.icon,
+                size: 19,
+                color: focused
+                    ? AppColor.primary
+                    : AppColor.textMuted,
+              ),
+            ),
+          ),
+
+          suffixIcon: widget.obscureText
+              ? IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _obscure = !_obscure;
+                    });
+                  },
+
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+
+                    color: AppColor.textMuted,
+
+                    size: 20,
+                  ),
+                )
+              : null,
+
+          filled: true,
+
+          fillColor: Colors.transparent,
+
+          border: InputBorder.none,
+
+          enabledBorder: InputBorder.none,
+
+          focusedBorder: InputBorder.none,
+
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 17,
           ),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
 }
 
-
-// ===============================================================
-// AuthPrimaryButton
-// ---------------------------------------------------------------
-// A reusable primary button for authentication actions such as
-// Login and Sign Up. It includes press animation and loading
-// indicator support to enhance user interaction.
-// ===============================================================
+// =================================================================
+// PRIMARY AUTH BUTTON
+// =================================================================
 
 class AuthPrimaryButton extends StatefulWidget {
   const AuthPrimaryButton({
@@ -197,109 +273,182 @@ class AuthPrimaryButton extends StatefulWidget {
 
   final String title;
   final VoidCallback? onTap;
+
   final bool loading;
 
   @override
-  State<AuthPrimaryButton> createState() => _AuthPrimaryButtonState();
+  State<AuthPrimaryButton> createState() =>
+      _AuthPrimaryButtonState();
 }
 
-class _AuthPrimaryButtonState extends State<AuthPrimaryButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _pressCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-      lowerBound: 0,
-      upperBound: 1,
-      value: 0,
-    );
-  }
-
-  @override
-  void dispose() {
-    _pressCtrl.dispose();
-    super.dispose();
-  }
+class _AuthPrimaryButtonState
+    extends State<AuthPrimaryButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.onTap == null || widget.loading;
+    final disabled =
+        widget.onTap == null || widget.loading;
 
     return GestureDetector(
-      onTapDown: disabled ? null : (_) => _pressCtrl.forward(),
-      onTapCancel: disabled ? null : () => _pressCtrl.reverse(),
-      onTapUp: disabled ? null : (_) => _pressCtrl.reverse(),
-      onTap: disabled ? null : widget.onTap,
-      child: AnimatedBuilder(
-        animation: _pressCtrl,
-        builder: (_, __) {
-          final scale = 1 - (_pressCtrl.value * 0.02);
+      onTapDown: disabled
+          ? null
+          : (_) {
+              setState(() {
+                _pressed = true;
+              });
+            },
 
-          return Transform.scale(
-            scale: scale,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 140),
-              opacity: disabled ? 0.75 : 1,
-              child: Container(
-                height: 56,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColor.primary,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 22,
-                      offset: const Offset(0, 12),
-                      color: AppColor.primary.withOpacity(0.28),
-                    ),
-                    BoxShadow(
-                      blurRadius: 26,
-                      offset: const Offset(0, 16),
-                      color: Colors.black.withOpacity(0.08),
-                    ),
-                  ],
-                ),
-                child: widget.loading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+      onTapCancel: disabled
+          ? null
+          : () {
+              setState(() {
+                _pressed = false;
+              });
+            },
+
+      onTapUp: disabled
+          ? null
+          : (_) {
+              setState(() {
+                _pressed = false;
+              });
+            },
+
+      onTap: disabled ? null : widget.onTap,
+
+      child: AnimatedScale(
+        duration: const Duration(
+          milliseconds: 110,
+        ),
+
+        scale: _pressed ? 0.975 : 1,
+
+        child: AnimatedOpacity(
+          duration: const Duration(
+            milliseconds: 140,
+          ),
+
+          opacity: disabled ? 0.58 : 1,
+
+          child: Container(
+            width: double.infinity,
+            height: 56,
+
+            decoration: BoxDecoration(
+              color: AppColor.secondary,
+
+              borderRadius: BorderRadius.circular(17),
+
+              boxShadow: disabled
+                  ? []
+                  : [
+                      BoxShadow(
+                        color:
+                            AppColor.secondary.withOpacity(
+                          0.16,
                         ),
-                      )
-                    : Text(
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+            ),
+
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // -------------------------------------------------
+                // SMALL PRIMARY ACCENT
+                // -------------------------------------------------
+
+                Positioned(
+                  left: 7,
+                  top: 7,
+                  bottom: 7,
+
+                  child: AnimatedContainer(
+                    duration:
+                        const Duration(milliseconds: 180),
+
+                    width: _pressed ? 5 : 7,
+
+                    decoration: BoxDecoration(
+                      color: AppColor.primary,
+
+                      borderRadius:
+                          BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+
+                // -------------------------------------------------
+                // CONTENT
+                // -------------------------------------------------
+
+                if (widget.loading)
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
+                    ),
+                  )
+                else
+                  Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
+
+                    children: [
+                      Text(
                         widget.title,
+
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          letterSpacing: 0.2,
+                          fontSize: 15,
+                          letterSpacing: 0.15,
                         ),
                       ),
-              ),
+
+                      const SizedBox(width: 9),
+
+                      Container(
+                        width: 27,
+                        height: 27,
+
+                        decoration: BoxDecoration(
+                          color: Colors.white
+                              .withOpacity(0.10),
+
+                          shape: BoxShape.circle,
+                        ),
+
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-
-// ===============================================================
-// AuthBloodDropdown
-// ---------------------------------------------------------------
-// A dropdown widget used to select blood groups during
-// user profile creation. It follows the same styling used
-// for authentication input fields.
-// ===============================================================
+// =================================================================
+// BLOOD GROUP SELECTOR
+// =================================================================
 
 class AuthBloodDropdown extends StatelessWidget {
   const AuthBloodDropdown({
@@ -309,40 +458,114 @@ class AuthBloodDropdown extends StatelessWidget {
   });
 
   final String value;
+
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    const items = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+    const items = [
+      "A+",
+      "A-",
+      "B+",
+      "B-",
+      "O+",
+      "O-",
+      "AB+",
+      "AB-",
+    ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-      decoration: BoxDecoration(
-        color: AuthTokens.inputFill,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AuthTokens.borderStrong),
+      width: double.infinity,
+
+      height: 58,
+
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
       ),
-      child: DropdownButton<String>(
-        value: value,
-        isExpanded: true,
-        underline: const SizedBox(),
-        iconEnabledColor: AuthTokens.textMuted,
-        dropdownColor: Colors.white,
-        items: items
-            .map(
-              (g) => DropdownMenuItem(
-                value: g,
-                child: Text(
-                  g,
-                  style: const TextStyle(
-                    color: AuthTokens.text,
-                    fontWeight: FontWeight.w800,
-                  ),
+
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+
+        borderRadius: BorderRadius.circular(17),
+
+        border: Border.all(
+          color: AppColor.borderStrong,
+        ),
+      ),
+
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+
+            decoration: BoxDecoration(
+              color: AppColor.dangerSoft,
+
+              borderRadius: BorderRadius.circular(11),
+            ),
+
+            child: const Icon(
+              Icons.bloodtype_outlined,
+              size: 19,
+              color: AppColor.danger,
+            ),
+          ),
+
+          const SizedBox(width: 11),
+
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+
+                isExpanded: true,
+
+                dropdownColor: AppColor.surface,
+
+                borderRadius: BorderRadius.circular(16),
+
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColor.textMuted,
                 ),
+
+                style: const TextStyle(
+                  color: AppColor.text,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+
+                items: items
+                    .map(
+                      (group) => DropdownMenuItem<String>(
+                        value: group,
+
+                        child: Row(
+                          children: [
+                            Text(
+                              group,
+                              style: const TextStyle(
+                                color: AppColor.text,
+                                fontWeight:
+                                    FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+
+                onChanged: (selected) {
+                  if (selected != null) {
+                    onChanged(selected);
+                  }
+                },
               ),
-            )
-            .toList(),
-        onChanged: (v) => v == null ? null : onChanged(v),
+            ),
+          ),
+        ],
       ),
     );
   }

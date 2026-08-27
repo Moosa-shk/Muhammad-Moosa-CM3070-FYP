@@ -1,29 +1,9 @@
-// ===============================================================
-// home_screen.dart
-// ---------------------------------------------------------------
-// This screen represents the main dashboard of the DisasterAid
-// mobile application.
-//
-// The dashboard acts as the central navigation hub where users
-// can access the primary features of the system, including:
-//
-// • Live disaster alerts
-// • Nearby shelters and safe zones
-// • Emergency SOS functionality
-// • Disaster preparedness learning material
-// • Safety quizzes
-// • Emergency service directory
-// • User settings and profile
-//
-// The screen also integrates a floating chatbot assistant that
-// helps users quickly retrieve emergency information.
-// ===============================================================
+// lib/screens/dashboard/home_screen.dart
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:disaster_app_ui/screens/EmergencyContacts.dart';
 import 'package:disaster_app_ui/screens/Learning/learning_screen.dart';
 import 'package:disaster_app_ui/screens/auth/auth_controller.dart';
-import 'package:disaster_app_ui/screens/chatbot/chatbot_screen.dart';
 import 'package:disaster_app_ui/screens/settingss/notifications_screen.dart';
 import 'package:disaster_app_ui/widgets/%20bottom_nav.dart';
 import 'package:disaster_app_ui/widgets/app_scaffold.dart';
@@ -33,7 +13,6 @@ import 'package:get/get.dart';
 
 import '../../config/colors.dart';
 import '../../widgets/text_widget.dart';
-import '../../widgets/info_card.dart';
 
 import '../auth/info_screen.dart';
 import '../maps/map_screen.dart';
@@ -49,72 +28,26 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-
-  /// Access the authentication controller
+class _HomeScreenState extends State<HomeScreen> {
   final auth = AuthController.to;
-
-  /// Animation controller for chatbot floating button
-  late final AnimationController _botCtrl;
-
-  // ===============================================================
-  // INIT STATE
-  // ---------------------------------------------------------------
-  // Initializes the animation controller for the chatbot FAB.
-  // ===============================================================
-
-  @override
-  void initState() {
-    super.initState();
-
-    _botCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
-  }
-
-  // ===============================================================
-  // DISPOSE
-  // ---------------------------------------------------------------
-  // Dispose animation controller to avoid memory leaks.
-  // ===============================================================
-
-  @override
-  void dispose() {
-    _botCtrl.dispose();
-    super.dispose();
-  }
-
-  // ===============================================================
-  // OPEN SOS SHEET
-  // ---------------------------------------------------------------
-  // Opens the SOS emergency bottom sheet which allows the user
-  // to quickly send location or call an emergency contact.
-  // ===============================================================
 
   void _openSosSheet({
     required String userName,
     required String emergency,
   }) {
-
-    /// Check if the user has an emergency contact
     if (emergency.trim().isEmpty) {
-
       Get.snackbar(
-        'Missing Emergency Contact',
-        'Please add an emergency number in Profile to use SOS.',
+        'Emergency contact required',
+        'Add an emergency number to use SOS.',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColor.danger,
         colorText: Colors.white,
       );
 
-      /// Navigate to profile screen to update contact
       Get.to(() => const InfoScreen());
       return;
     }
 
-    /// Open SOS emergency interface
     Get.bottomSheet(
       SosBottomSheet(
         userName: userName,
@@ -125,28 +58,14 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ===============================================================
-  // BUILD METHOD
-  // ---------------------------------------------------------------
-  // The main UI of the dashboard showing different emergency
-  // features and quick-access navigation cards.
-  // ===============================================================
-
   @override
   Widget build(BuildContext context) {
-
     return Obx(() {
-
-      /// Get current logged-in user
       final user = auth.currentUser.value;
 
-      /// Display user name if available
       final userName =
-          (user?.name != null && user!.name.isNotEmpty)
-              ? user.name
-              : "there";
+          (user?.name != null && user!.name.isNotEmpty) ? user.name : "there";
 
-      /// Emergency contact number
       final emergency = user?.emergencyContact ?? "";
 
       return AppScaffold(
@@ -154,118 +73,151 @@ class _HomeScreenState extends State<HomeScreen>
         subtitle: null,
         scroll: true,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-
-        /// Bottom navigation bar
-        bottomNavigationBar: const BottomNavBar(currentIndex: 0),
-
-        appBarActions: const [],
-
-        // ==========================================================
-        // FLOATING CHATBOT BUTTON
-        // ==========================================================
-
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-
-        floatingActionButton: _AnimatedBotFab(
-          ctrl: _botCtrl,
-          onTap: () => Get.to(() => const ChatbotScreen()),
+        bottomNavigationBar: const BottomNavBar(
+          currentIndex: 0,
         ),
-
-        // ==========================================================
-        // MAIN DASHBOARD CONTENT
-        // ==========================================================
-
+        appBarActions: const [],
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 4),
 
-            const SizedBox(height: 6),
+            // =====================================================
+            // TOP BAR
+            // =====================================================
 
-            /// Top profile bar
-            _topBar(user),
+            _topBar(
+              user: user,
+              userName: userName,
+            ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            /// Safety status message
-            _headlineStrip(userName),
+            // =====================================================
+            // SAFETY STATUS
+            // =====================================================
+
+            _safetyBanner(),
 
             const SizedBox(height: 14),
 
-            /// SOS emergency button
-            _sosButton(
-              onTap: () => _openSosSheet(
-                userName: userName,
-                emergency: emergency,
-              ),
+            // =====================================================
+            // SOS
+            // =====================================================
+
+            _sosSection(
+              onTap: () {
+                _openSosSheet(
+                  userName: userName,
+                  emergency: emergency,
+                );
+              },
             ),
 
-            const SizedBox(height: 22),
+            const SizedBox(height: 28),
 
-            /// Disaster alerts section
-            InfoCard(
-              title: "Live Alerts",
-              subtitle: "View ongoing disasters & warnings",
-              icon: Icons.warning_amber_rounded,
-              onTap: () => Get.to(
-                () => const AlertScreen(),
-                transition: Transition.rightToLeft,
-              ),
+            // =====================================================
+            // SAFETY
+            // =====================================================
+
+            _sectionHeading(
+              "Safety",
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            /// Map and shelter locator
-            InfoCard(
-              title: "Map & Shelters",
-              subtitle: "Find safe zones near you",
-              icon: Icons.map_rounded,
-              onTap: () => Get.to(() => const MapsScreen()),
+            _alertsFeature(),
+
+            const SizedBox(height: 14),
+
+            // =====================================================
+            // MAP + LEARNING
+            // =====================================================
+
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _mediumFeature(
+                    icon: FontAwesomeIcons.locationDot,
+                    title: "Shelters",
+                    subtitle: "Nearby safe places",
+                    accent: AppColor.info,
+                    onTap: () {
+                      Get.to(
+                        () => const MapsScreen(),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _mediumFeature(
+                    icon: FontAwesomeIcons.bookOpen,
+                    title: "Preparedness",
+                    subtitle: "Guides & learning",
+                    accent: AppColor.safeGreen,
+                    onTap: () {
+                      Get.to(
+                        () => const LearningScreen(),
+                        transition: Transition.rightToLeft,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
 
-            /// Safety quiz feature
-            InfoCard(
-              title: "Take Quiz",
-              subtitle: "Test your safety knowledge",
-              icon: Icons.quiz_rounded,
-              onTap: () => Get.to(() => const QuizListScreen()),
+            // =====================================================
+            // TOOLS
+            // =====================================================
+
+            _sectionHeading(
+              "Tools",
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
-            /// Learning and preparedness resources
-            InfoCard(
-              title: "Learning & Knowledge",
-              subtitle: "Understand disasters & stay prepared",
-              icon: Icons.menu_book_rounded,
-              onTap: () => Get.to(
-                () => const LearningScreen(),
-                transition: Transition.rightToLeft,
-              ),
+            _utilityRow(
+              icon: FontAwesomeIcons.circleQuestion,
+              title: "Safety Quiz",
+              accent: AppColor.warning,
+              onTap: () {
+                Get.to(
+                  () => const QuizListScreen(),
+                );
+              },
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
-            /// Emergency service directory
-            InfoCard(
+            _utilityRow(
+              icon: FontAwesomeIcons.phone,
               title: "Emergency Directory",
-              subtitle: "Police, fire, rescue & helplines",
-              icon: Icons.phone_in_talk_rounded,
-              onTap: () => Get.to(() => const EmergencyDirectoryScreen()),
+              accent: AppColor.danger,
+              onTap: () {
+                Get.to(
+                  () => const EmergencyDirectoryScreen(),
+                );
+              },
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
-            /// Application settings
-            InfoCard(
+            _utilityRow(
+              icon: FontAwesomeIcons.sliders,
               title: "Settings",
-              subtitle: "Profile, language & preferences",
-              icon: Icons.settings_rounded,
-              onTap: () => Get.to(() => const SettingsScreen()),
+              accent: AppColor.primary,
+              onTap: () {
+                Get.to(
+                  () => const SettingsScreen(),
+                );
+              },
             ),
 
-            /// Space for floating button
-            const SizedBox(height: 70),
+            const SizedBox(height: 40),
           ],
         ),
       );
@@ -274,89 +226,103 @@ class _HomeScreenState extends State<HomeScreen>
 
   // ===============================================================
   // TOP BAR
-  // ---------------------------------------------------------------
-  // Displays the user's profile image, dashboard title, and
-  // notification icon.
   // ===============================================================
 
-  Widget _topBar(user) {
+  Widget _topBar({
+    required dynamic user,
+    required String userName,
+  }) {
+    final hasImage = user?.profileImage != null &&
+        user.profileImage.toString().trim().isNotEmpty;
+
     return Row(
       children: [
-
-        /// Profile image
         GestureDetector(
-          onTap: () => Get.to(() => const InfoScreen()),
+          onTap: () {
+            Get.to(
+              () => const InfoScreen(),
+            );
+          },
           child: Container(
-            padding: const EdgeInsets.all(3),
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.72),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppColor.border),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 18,
-                  color: Colors.black.withOpacity(0.10),
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColor.border,
+              ),
             ),
-
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.grey.shade300,
-
-              /// Load profile image if available
-              backgroundImage:
-                  (user?.profileImage != null &&
-                          user!.profileImage!.isNotEmpty)
-                      ? CachedNetworkImageProvider(user.profileImage!)
-                      : null,
-
-              child:
-                  (user?.profileImage == null ||
-                          user!.profileImage!.isEmpty)
-                      ? const Icon(
-                          Icons.person,
-                          size: 20,
-                          color: Colors.grey,
-                        )
-                      : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: hasImage
+                  ? CachedNetworkImage(
+                      imageUrl: user.profileImage,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      color: AppColor.primarySoft,
+                      child: const Center(
+                        child: FaIcon(
+                          FontAwesomeIcons.user,
+                          color: AppColor.primary,
+                          size: 18,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ),
-
-        /// Dashboard title
-        const Expanded(
-          child: Center(
-            child: TextWidget(
-              "DisasterAid Dashboard",
-              size: 17,
-              weight: FontWeight.w900,
-              color: AppColor.secondary,
-            ),
-          ),
-        ),
-
-        /// Notifications button
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColor.border),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 18,
-                color: Colors.black.withOpacity(0.10),
-                offset: const Offset(0, 8),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextWidget(
+                "Hi, $userName",
+                size: 17,
+                weight: FontWeight.w800,
+                color: AppColor.text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              const TextWidget(
+                "RescueAid",
+                size: 11.5,
+                weight: FontWeight.w600,
+                color: AppColor.textMuted,
               ),
             ],
           ),
-
-          child: IconButton(
-            onPressed: () => Get.to(() => NotificationsScreen()),
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: AppColor.primary,
+        ),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              Get.to(
+                () => NotificationsScreen(),
+              );
+            },
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColor.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColor.border,
+                ),
+              ),
+              child: const Center(
+                child: FaIcon(
+                  FontAwesomeIcons.bell,
+                  color: AppColor.primary,
+                  size: 18,
+                ),
+              ),
             ),
           ),
         ),
@@ -365,241 +331,410 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ===============================================================
-  // SOS BUTTON
-  // ---------------------------------------------------------------
-  // Emergency quick-action button allowing the user to send
-  // location or call emergency contact immediately.
+  // SAFETY BANNER
   // ===============================================================
 
-  Widget _sosButton({required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-
-      child: Container(
-        width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
-        decoration: BoxDecoration(
-          color: AppColor.primary,
-          borderRadius: BorderRadius.circular(18),
-
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.primary.withOpacity(0.22),
-              blurRadius: 20,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 14),
-            ),
-          ],
-        ),
-
-        child: Row(
-          children: [
-
-            /// SOS icon
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.sos_rounded, color: Colors.white),
-            ),
-
-            const SizedBox(width: 12),
-
-            /// SOS text description
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  TextWidget(
-                    "SOS Emergency",
-                    size: 16,
-                    weight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-
-                  SizedBox(height: 2),
-
-                  TextWidget(
-                    "Send SMS with live location or call contact",
-                    size: 12,
-                    weight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ],
-              ),
-            ),
-
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: Colors.white,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===============================================================
-  // HEADLINE STRIP
-  // ---------------------------------------------------------------
-  // Displays a status message indicating whether the user is
-  // currently safe or if there is a nearby disaster alert.
-  // ===============================================================
-
-  Widget _headlineStrip(String userName) {
-
+  Widget _safetyBanner() {
     const bool hasAlert = false;
 
-    final Color bgColor =
-        hasAlert
-            ? Colors.red.withOpacity(0.12)
-            : Colors.green.withOpacity(0.12);
+    final color = hasAlert ? AppColor.danger : AppColor.safeGreen;
 
-    final Color dotColor =
-        hasAlert ? Colors.redAccent : Colors.green;
+    final IconData icon = hasAlert
+        ? FontAwesomeIcons.triangleExclamation
+        : FontAwesomeIcons.shield;
 
-    final String message =
-        hasAlert
-            ? "⚠️ $userName, stay alert! Disaster detected nearby."
-            : "Hello, $userName 👋 You are safe right now ✅ ";
+    final text = hasAlert ? "Alert detected nearby" : "No nearby alerts";
 
-    return GestureDetector(
-      onTap: () => Get.to(() => const AlertScreen()),
-
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColor.border),
-        ),
-
-        child: Row(
-          children: [
-
-            /// Status indicator dot
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Get.to(
+            () => const AlertScreen(),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withOpacity(0.14),
             ),
-
-            const SizedBox(width: 14),
-
-            /// Status message
-            Expanded(
-              child: Text(
-                message,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColor.secondary,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 31,
+                height: 31,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: FaIcon(
+                    icon,
+                    size: 14,
+                    color: color,
+                  ),
                 ),
               ),
-            ),
-
-            const SizedBox(width: 8),
-
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: AppColor.secondary,
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextWidget(
+                  text,
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: AppColor.text,
+                ),
+              ),
+              const FaIcon(
+                FontAwesomeIcons.arrowUpRightFromSquare,
+                size: 12,
+                color: AppColor.textMuted,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-// ===============================================================
-// ANIMATED CHATBOT FLOATING BUTTON
-// ---------------------------------------------------------------
-// Displays an animated floating button that opens the chatbot
-// assistant when pressed.
-// ===============================================================
+  // ===============================================================
+  // SOS
+  // ===============================================================
 
-class _AnimatedBotFab extends StatelessWidget {
-
-  const _AnimatedBotFab({
-    required this.ctrl,
-    required this.onTap,
-  });
-
-  final AnimationController ctrl;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-
-    return AnimatedBuilder(
-      animation: ctrl,
-
-      builder: (_, __) {
-
-        final t = ctrl.value;
-
-        final scale = 1.0 + (t * 0.06);
-        final glow = 0.18 + (t * 0.10);
-
-        return Transform.scale(
-          scale: scale,
-
-          child: GestureDetector(
-            onTap: onTap,
-
-            child: Container(
-              width: 56,
-              height: 56,
-
-              decoration: BoxDecoration(
-                color: AppColor.primary,
-                shape: BoxShape.circle,
-
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.primary.withOpacity(glow),
-                    blurRadius: 26,
-                    offset: const Offset(0, 14),
+  Widget _sosSection({
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            16,
+            14,
+            16,
+          ),
+          decoration: BoxDecoration(
+            color: AppColor.secondary,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.secondary.withOpacity(0.14),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColor.danger,
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Center(
+                  child: FaIcon(
+                    FontAwesomeIcons.lifeRing,
+                    color: Colors.white,
+                    size: 23,
                   ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.10),
-                    blurRadius: 18,
-                    offset: const Offset(0, 12),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "Emergency SOS",
+                      size: 16,
+                      weight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                    SizedBox(height: 3),
+                    TextWidget(
+                      "Call or share your location",
+                      size: 11.5,
+                      color: Color(0xCCFFFFFF),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: FaIcon(
+                    FontAwesomeIcons.arrowRight,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // SECTION HEADING
+  // ===============================================================
+
+  Widget _sectionHeading(
+    String title,
+  ) {
+    return TextWidget(
+      title,
+      size: 15,
+      weight: FontWeight.w800,
+      color: AppColor.text,
+    );
+  }
+
+  // ===============================================================
+  // ALERT FEATURE
+  // ===============================================================
+
+  Widget _alertsFeature() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () {
+          Get.to(
+            () => const AlertScreen(),
+            transition: Transition.rightToLeft,
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(17),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppColor.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColor.dangerSoft,
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Center(
+                  child: FaIcon(
+                    FontAwesomeIcons.satelliteDish,
+                    color: AppColor.danger,
+                    size: 23,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 15),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "Live Alerts",
+                      size: 16,
+                      weight: FontWeight.w800,
+                      color: AppColor.text,
+                    ),
+                    SizedBox(height: 4),
+                    TextWidget(
+                      "Warnings and active events",
+                      size: 11.5,
+                      color: AppColor.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 35,
+                height: 35,
+                decoration: BoxDecoration(
+                  color: AppColor.inputFill,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: FaIcon(
+                    FontAwesomeIcons.arrowRight,
+                    color: AppColor.primary,
+                    size: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // MEDIUM FEATURE
+  // ===============================================================
+
+  Widget _mediumFeature({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          height: 142,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColor.border,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 41,
+                    height: 41,
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.09),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Center(
+                      child: FaIcon(
+                        icon,
+                        color: accent,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  const FaIcon(
+                    FontAwesomeIcons.arrowUpRightFromSquare,
+                    size: 12,
+                    color: AppColor.textMuted,
                   ),
                 ],
               ),
-
-              child: const Center(
-                child: FaIcon(
-                  FontAwesomeIcons.robot,
-                  color: Colors.white,
-                  size: 26,
-                ),
+              const Spacer(),
+              TextWidget(
+                title,
+                size: 13.5,
+                weight: FontWeight.w800,
+                color: AppColor.text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 3),
+              TextWidget(
+                subtitle,
+                size: 10.5,
+                color: AppColor.textMuted,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // UTILITY ROW
+  // ===============================================================
+
+  Widget _utilityRow({
+    required IconData icon,
+    required String title,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 13,
+          ),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColor.border,
             ),
           ),
-        );
-      },
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.09),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: FaIcon(
+                    icon,
+                    size: 16,
+                    color: accent,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextWidget(
+                  title,
+                  size: 13.5,
+                  weight: FontWeight.w700,
+                  color: AppColor.text,
+                ),
+              ),
+              const FaIcon(
+                FontAwesomeIcons.chevronRight,
+                size: 12,
+                color: AppColor.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

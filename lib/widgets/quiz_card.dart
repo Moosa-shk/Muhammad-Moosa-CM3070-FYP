@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+
 import '../config/colors.dart';
 import 'text_widget.dart';
 
 /// QuizOptionCard represents a selectable option within the quiz module.
-/// It visually indicates whether the option is selected and allows
-/// users to choose an answer by tapping the card.
+///
+/// IMPORTANT:
+/// Public API is intentionally preserved:
+/// - option
+/// - selected
+/// - onTap
+///
+/// Only the visual design has been updated.
 class QuizOptionCard extends StatelessWidget {
-
   /// Text representing the quiz answer option
   final String option;
 
-  /// Boolean value indicating whether this option is currently selected
+  /// Whether this option is currently selected
   final bool selected;
 
-  /// Callback function triggered when the user taps the option
+  /// Triggered when the user taps this option
   final VoidCallback onTap;
 
   const QuizOptionCard({
@@ -25,65 +31,164 @@ class QuizOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-
-      /// Handle user tap interaction
-      onTap: onTap,
-
-      /// AnimatedContainer allows smooth transitions
-      /// when the option selection state changes
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 12),
-
-        /// Card styling
-        decoration: BoxDecoration(
-
-          /// Background color changes when selected
-          color: selected
-              ? AppColor.primary.withOpacity(0.10)
-              : AppColor.cardFill,
-
-          borderRadius: BorderRadius.circular(16),
-
-          /// Border color highlights the selected option
-          border: Border.all(
-            color: selected ? AppColor.primary : AppColor.borderStrong,
-            width: 1.5,
-          ),
-
-          /// Shadow effect for visual elevation
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.shadow,
-              blurRadius: 12,
-              offset: const Offset(0, 8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            width: double.infinity,
+            constraints: const BoxConstraints(
+              minHeight: 68,
             ),
-          ],
-        ),
-
-        child: Row(
-          children: [
-
-            /// Radio-style icon showing selected or unselected state
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected ? AppColor.primary : AppColor.textMuted,
+            padding: const EdgeInsets.fromLTRB(
+              14,
+              12,
+              16,
+              12,
             ),
-
-            const SizedBox(width: 12),
-
-            /// Display option text
-            Expanded(
-              child: TextWidget(
-                option,
-                size: 15,
-                weight: FontWeight.w700,
-                color: AppColor.text,
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColor.primary.withOpacity(0.08)
+                  : AppColor.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected
+                    ? AppColor.primary.withOpacity(0.55)
+                    : AppColor.border,
+                width: selected ? 1.5 : 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: selected
+                      ? AppColor.primary.withOpacity(0.10)
+                      : AppColor.shadow,
+                  blurRadius: selected ? 18 : 12,
+                  offset: const Offset(0, 7),
+                ),
+              ],
             ),
-          ],
+            child: Row(
+              children: [
+                // =================================================
+                // SELECTION INDICATOR
+                // =================================================
+
+                AnimatedContainer(
+                  duration: const Duration(
+                    milliseconds: 220,
+                  ),
+                  curve: Curves.easeOutCubic,
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColor.primary
+                        : AppColor.inputFill,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: selected
+                          ? AppColor.primary
+                          : AppColor.borderStrong,
+                    ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: AppColor.primary.withOpacity(
+                                0.20,
+                              ),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(
+                      milliseconds: 180,
+                    ),
+                    transitionBuilder: (
+                      child,
+                      animation,
+                    ) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: child,
+                      );
+                    },
+                    child: Icon(
+                      selected
+                          ? Icons.check_rounded
+                          : Icons.circle_outlined,
+                      key: ValueKey(selected),
+                      size: selected ? 22 : 19,
+                      color: selected
+                          ? Colors.white
+                          : AppColor.textMuted,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                // =================================================
+                // OPTION
+                // =================================================
+
+                Expanded(
+                  child: TextWidget(
+                    option,
+                    size: 14.5,
+                    weight: selected
+                        ? FontWeight.w900
+                        : FontWeight.w700,
+                    color: selected
+                        ? AppColor.text
+                        : AppColor.text,
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                // =================================================
+                // RIGHT SELECTION STATE
+                // =================================================
+
+                AnimatedContainer(
+                  duration: const Duration(
+                    milliseconds: 220,
+                  ),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColor.primary.withOpacity(0.12)
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected
+                          ? AppColor.primary
+                          : AppColor.borderStrong,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: selected
+                      ? const Center(
+                          child: Icon(
+                            Icons.circle,
+                            size: 9,
+                            color: AppColor.primary,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,6 +1,4 @@
 // lib/screens/quiz/categories_detail_screen.dart
-// This screen shows the progress of a quiz category and unlocks safety kit items
-// based on the number of correct answers the user gives.
 
 import 'package:disaster_app_ui/widgets/app_scaffold.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:disaster_app_ui/config/colors.dart';
+import 'package:disaster_app_ui/widgets/text_widget.dart';
+
 import 'quiz_screen.dart';
 
 class CategoriesDetailScreen extends StatelessWidget {
@@ -19,7 +19,6 @@ class CategoriesDetailScreen extends StatelessWidget {
     required this.category,
   });
 
-  // Images representing emergency safety kit items
   static const List<String> kitImages = [
     'assets/images/kit_first_aid.png',
     'assets/images/kit_flashlight.png',
@@ -28,276 +27,344 @@ class CategoriesDetailScreen extends StatelessWidget {
     'assets/images/kit_food.png',
   ];
 
+  // ===============================================================
+  // FIRESTORE CATEGORY MAPPING
+  // PRESERVED
+  // ===============================================================
+
+  String get _categoryId {
+    switch (category) {
+      case 'Emergency Basics':
+        return 'emergency_basics';
+
+      case 'Food & Water Safety':
+        return 'food_water_safety';
+
+      case 'First Aid & Health':
+        return 'first_aid_health';
+
+      case 'Disaster Response':
+        return 'disaster_response';
+
+      default:
+        return category
+            .trim()
+            .toLowerCase()
+            .replaceAll('&', 'and')
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+            .replaceAll(RegExp(r'^_+|_+$'), '');
+    }
+  }
+
+  // ===============================================================
+  // FIRESTORE QUESTIONS REFERENCE
+  // PRESERVED
+  // ===============================================================
+
+  CollectionReference<Map<String, dynamic>> get _questionsRef {
+    return FirebaseFirestore.instance
+        .collection('quizzes')
+        .doc(_categoryId)
+        .collection('questions');
+  }
+
+  // ===============================================================
+  // BUILD
+  // ===============================================================
+
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Please login to access quizzes.',
+          ),
+        ),
+      );
+    }
+
+    final uid = user.uid;
 
     return AppScaffold(
-      title: category.toUpperCase(),
-      subtitle: "Unlock safety kit items by answering correctly",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: false,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+      ),
 
-      // Fetch all questions belonging to the selected category
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collectionGroup('questions')
-            .where('category', isEqualTo: category)
-            .snapshots(),
-        builder: (_, questionSnap) {
-          if (!questionSnap.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColor.primary),
+      child: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
+        stream: _questionsRef.snapshots(),
+
+        builder: (
+          context,
+          questionSnap,
+        ) {
+          // =======================================================
+          // QUESTIONS ERROR
+          // =======================================================
+
+          if (questionSnap.hasError) {
+            return _errorState(
+              title:
+                  'Unable to load questions',
+              message:
+                  questionSnap.error.toString(),
             );
           }
 
-          final totalQuestions = questionSnap.data!.docs.length;
+          // =======================================================
+          // QUESTIONS LOADING
+          // =======================================================
 
-          // Fetch user's correct attempts for this category
-          return StreamBuilder<QuerySnapshot>(
+          if (questionSnap.connectionState ==
+              ConnectionState.waiting) {
+            return _loadingState();
+          }
+
+          final questionDocs =
+              questionSnap.data?.docs ?? [];
+
+          final totalQuestions =
+              questionDocs.length;
+
+          // =======================================================
+          // USER QUIZ ATTEMPTS
+          // FIRESTORE LOGIC PRESERVED
+          // =======================================================
+
+          return StreamBuilder<
+              QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('users')
                 .doc(uid)
                 .collection('quizAttempts')
-                .where('category', isEqualTo: category)
-                .where('isCorrect', isEqualTo: true)
+                .where(
+                  'category',
+                  isEqualTo: category,
+                )
+                .where(
+                  'isCorrect',
+                  isEqualTo: true,
+                )
                 .snapshots(),
-            builder: (_, attemptSnap) {
-              final attempts = attemptSnap.data?.docs ?? [];
+
+            builder: (
+              context,
+              attemptSnap,
+            ) {
+              // ===================================================
+              // ATTEMPT ERROR
+              // ===================================================
+
+              if (attemptSnap.hasError) {
+                return _errorState(
+                  title:
+                      'Unable to load quiz progress',
+                  message:
+                      attemptSnap.error.toString(),
+                );
+              }
+
+              // ===================================================
+              // ATTEMPT LOADING
+              // ===================================================
+
+              if (attemptSnap.connectionState ==
+                  ConnectionState.waiting) {
+                return _loadingState();
+              }
+
+              final attempts =
+                  attemptSnap.data?.docs ?? [];
 
               final completedQuestions =
-                  attempts.map((d) => d['questionId']).toSet().length;
+                  attempts
+                      .map(
+                        (d) => d
+                            .data()['questionId']
+                            ?.toString(),
+                      )
+                      .whereType<String>()
+                      .toSet()
+                      .length;
 
-              final safeCompleted = completedQuestions.clamp(0, totalQuestions);
-              final unlockedKits = safeCompleted.clamp(0, kitImages.length);
-              final allKitsUnlocked = unlockedKits == kitImages.length;
+              final safeCompleted =
+                  completedQuestions.clamp(
+                0,
+                totalQuestions,
+              );
+
+              final unlockedKits =
+                  safeCompleted.clamp(
+                0,
+                kitImages.length,
+              );
+
+              final allKitsUnlocked =
+                  unlockedKits ==
+                          kitImages.length &&
+                      totalQuestions > 0;
 
               final progress =
-                  totalQuestions == 0 ? 0.0 : safeCompleted / totalQuestions;
+                  totalQuestions == 0
+                      ? 0.0
+                      : safeCompleted /
+                          totalQuestions;
 
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 8),
+                  // =================================================
+                  // CUSTOM CATEGORY HEADER
+                  // =================================================
 
-                  // Progress card showing quiz completion and unlocked items
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 650),
-                    tween: Tween(begin: 0, end: 1),
-                    curve: Curves.easeOutCubic,
-                    builder: (_, v, child) => Opacity(
-                      opacity: v,
-                      child: Transform.translate(
-                        offset: Offset(0, 18 * (1 - v)),
-                        child: child,
-                      ),
-                    ),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                      decoration: BoxDecoration(
-                        color: AppColor.cardFill,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: AppColor.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColor.shadow,
-                            blurRadius: 18,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: AppColor.primary.withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColor.primary.withOpacity(0.20),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.inventory_2_rounded,
-                                  color: AppColor.primary,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  "Safety Kit Progress",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 15,
-                                    color: AppColor.text,
-                                  ),
-                                ),
-                              ),
-                              _miniPill(
-                                allKitsUnlocked ? "Completed" : "In progress",
-                                color: allKitsUnlocked
-                                    ? AppColor.safeGreen
-                                    : AppColor.primary,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-
-                          // Progress bar
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              value: progress.clamp(0, 1),
-                              minHeight: 12,
-                              backgroundColor: Colors.white.withOpacity(0.55),
-                              color: AppColor.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          Row(
-                            children: [
-                              Text(
-                                "$safeCompleted / $totalQuestions questions",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColor.textMuted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                "$unlockedKits / ${kitImages.length} items unlocked",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColor.textMuted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                  _pageHeader(
+                    completed:
+                        safeCompleted,
+                    total:
+                        totalQuestions,
                   ),
 
-                  const SizedBox(height: 18),
-
-                  const Text(
-                    "Unlocked Items",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppColor.text,
-                    ),
+                  const SizedBox(
+                    height: 22,
                   ),
-                  const SizedBox(height: 12),
 
-                  // Grid showing unlocked safety kit items
+                  // =================================================
+                  // PROGRESS COMMAND PANEL
+                  // =================================================
+
+                  _progressPanel(
+                    completed:
+                        safeCompleted,
+                    totalQuestions:
+                        totalQuestions,
+                    unlocked:
+                        unlockedKits,
+                    progress:
+                        progress,
+                    completedCategory:
+                        allKitsUnlocked,
+                  ),
+
+                  const SizedBox(
+                    height: 24,
+                  ),
+
+                  // =================================================
+                  // KIT LOCKER TITLE
+                  // =================================================
+
+                  _kitHeading(
+                    unlocked:
+                        unlockedKits,
+                  ),
+
+                  const SizedBox(
+                    height: 13,
+                  ),
+
+                  // =================================================
+                  // KIT LOCKER
+                  // =================================================
+
                   Expanded(
-                    child: unlockedKits == 0
-                        ? _emptyState(totalQuestions: totalQuestions)
-                        : GridView.builder(
-                            padding: const EdgeInsets.only(bottom: 140),
-                            itemCount: unlockedKits,
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 1,
-                            ),
-                            itemBuilder: (_, i) {
-                              return TweenAnimationBuilder<double>(
-                                duration: Duration(milliseconds: 380 + i * 90),
-                                tween: Tween(begin: 0, end: 1),
-                                curve: Curves.easeOutCubic,
-                                builder: (_, v, child) => Opacity(
-                                  opacity: v,
-                                  child: Transform.scale(
-                                    scale: 0.95 + (0.05 * v),
-                                    child: child,
-                                  ),
-                                ),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: AppColor.cardFill,
-                                    borderRadius: BorderRadius.circular(22),
-                                    border: Border.all(color: AppColor.border),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColor.shadow,
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 10),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: Image.asset(
-                                      kitImages[i],
-                                      height: 74,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                    child: totalQuestions == 0
+                        ? _emptyQuestionsState()
+                        : _kitLocker(
+                            unlockedKits:
+                                unlockedKits,
                           ),
                   ),
 
-                  // Button to start the quiz
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: allKitsUnlocked
-                              ? Colors.grey.shade400
-                              : AppColor.primary,
-                          elevation: allKitsUnlocked ? 0 : 10,
-                          shadowColor: AppColor.primary.withOpacity(0.30),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        onPressed: allKitsUnlocked || totalQuestions == 0
-                            ? null
-                            : () async {
-                                final snap = await FirebaseFirestore.instance
-                                    .collectionGroup('questions')
-                                    .where('category', isEqualTo: category)
-                                    .get();
+                  const SizedBox(
+                    height: 16,
+                  ),
 
-                                final questions = snap.docs
-                                    .map((d) => {'id': d.id, ...d.data()})
-                                    .toList();
+                  // =================================================
+                  // START / COMPLETED ACTION
+                  // =================================================
 
-                                Get.to(() => QuizScreen(
-                                      category: category,
-                                      questions: questions,
-                                    ));
-                              },
-                        child: Text(
-                          allKitsUnlocked ? "CATEGORY COMPLETED" : "START QUIZ",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.1,
-                            color: allKitsUnlocked
-                                ? Colors.white.withOpacity(0.92)
-                                : Colors.white,
-                            fontSize: 15,
+                  _startButton(
+                    allKitsUnlocked:
+                        allKitsUnlocked,
+                    totalQuestions:
+                        totalQuestions,
+                    onPressed: () async {
+                      try {
+                        final snap =
+                            await _questionsRef
+                                .get();
+
+                        final questions =
+                            snap.docs.map(
+                          (d) {
+                            return <
+                                String,
+                                dynamic>{
+                              'id': d.id,
+                              ...d.data(),
+                            };
+                          },
+                        ).toList();
+
+                        if (questions
+                            .isEmpty) {
+                          Get.snackbar(
+                            'Quiz',
+                            'No questions found for this category.',
+                            backgroundColor:
+                                AppColor
+                                    .danger,
+                            colorText:
+                                Colors
+                                    .white,
+                          );
+
+                          return;
+                        }
+
+                        Get.to(
+                          () => QuizScreen(
+                            category:
+                                category,
+                            questions:
+                                questions,
                           ),
-                        ),
-                      ),
-                    ),
+                        );
+                      } on FirebaseException catch (e) {
+                        Get.snackbar(
+                          'Firebase Error',
+                          e.message ??
+                              e.code,
+                          backgroundColor:
+                              AppColor
+                                  .danger,
+                          colorText:
+                              Colors.white,
+                        );
+                      } catch (e) {
+                        Get.snackbar(
+                          'Error',
+                          e.toString(),
+                          backgroundColor:
+                              AppColor
+                                  .danger,
+                          colorText:
+                              Colors.white,
+                        );
+                      }
+                    },
+                  ),
+
+                  const SizedBox(
+                    height: 24,
                   ),
                 ],
               );
@@ -308,82 +375,1028 @@ class CategoriesDetailScreen extends StatelessWidget {
     );
   }
 
-  // Small status pill used inside the progress card
-  static Widget _miniPill(String text, {required Color color}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.18)),
+  // ===============================================================
+  // CUSTOM PAGE HEADER
+  // ===============================================================
+
+  Widget _pageHeader({
+    required int completed,
+    required int total,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+
+      child: Column(
+        children: [
+          TextWidget(
+            category.toUpperCase(),
+            size: 25,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+            align: TextAlign.center,
+          ),
+
+          const SizedBox(
+            height: 6,
+          ),
+
+          const TextWidget(
+            "Unlock safety kit items by answering correctly",
+            size: 12.5,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
+          ),
+
+          const SizedBox(
+            height: 14,
+          ),
+
+          Container(
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 7,
+            ),
+
+            decoration:
+                BoxDecoration(
+              color:
+                  AppColor.inputFill,
+
+              borderRadius:
+                  BorderRadius.circular(
+                999,
+              ),
+
+              border:
+                  Border.all(
+                color:
+                    AppColor.border,
+              ),
+            ),
+
+            child: TextWidget(
+              "$completed of $total completed",
+              size: 11,
+              weight:
+                  FontWeight.w800,
+              color:
+                  AppColor.textMuted,
+            ),
+          ),
+        ],
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontWeight: FontWeight.w900,
-          fontSize: 11,
-          color: color,
+    );
+  }
+
+  // ===============================================================
+  // PROGRESS PANEL
+  // ===============================================================
+
+  Widget _progressPanel({
+    required int completed,
+    required int totalQuestions,
+    required int unlocked,
+    required double progress,
+    required bool completedCategory,
+  }) {
+    return Container(
+      width: double.infinity,
+
+      padding:
+          const EdgeInsets.all(
+        18,
+      ),
+
+      decoration:
+          BoxDecoration(
+        color:
+            AppColor.secondary,
+
+        borderRadius:
+            BorderRadius.circular(
+          24,
+        ),
+
+        boxShadow: [
+          BoxShadow(
+            color: AppColor
+                .secondary
+                .withOpacity(
+              0.15,
+            ),
+
+            blurRadius:
+                20,
+
+            offset:
+                const Offset(
+              0,
+              10,
+            ),
+          ),
+        ],
+      ),
+
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+
+                decoration:
+                    BoxDecoration(
+                  color:
+                      Colors.white
+                          .withOpacity(
+                    0.10,
+                  ),
+
+                  borderRadius:
+                      BorderRadius.circular(
+                    15,
+                  ),
+                ),
+
+                child: Icon(
+                  completedCategory
+                      ? Icons
+                          .workspace_premium_rounded
+                      : Icons
+                          .inventory_2_outlined,
+                  color:
+                      Colors.white,
+                  size:
+                      24,
+                ),
+              ),
+
+              const SizedBox(
+                width: 13,
+              ),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
+                  children: [
+                    const TextWidget(
+                      "Safety Kit Progress",
+                      size: 16,
+                      weight:
+                          FontWeight.w800,
+                      color:
+                          Colors.white,
+                    ),
+
+                    const SizedBox(
+                      height: 3,
+                    ),
+
+                    TextWidget(
+                      completedCategory
+                          ? "All kit items unlocked"
+                          : "$unlocked of ${kitImages.length} items unlocked",
+                      size: 11.5,
+                      color: Colors
+                          .white
+                          .withOpacity(
+                        0.72,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal:
+                      11,
+                  vertical:
+                      7,
+                ),
+
+                decoration:
+                    BoxDecoration(
+                  color:
+                      Colors.white
+                          .withOpacity(
+                    0.10,
+                  ),
+
+                  borderRadius:
+                      BorderRadius.circular(
+                    999,
+                  ),
+                ),
+
+                child:
+                    TextWidget(
+                  completedCategory
+                      ? "DONE"
+                      : "${(progress * 100).round()}%",
+
+                  size:
+                      11,
+
+                  weight:
+                      FontWeight.w900,
+
+                  color:
+                      Colors.white,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 20,
+          ),
+
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(
+              999,
+            ),
+
+            child:
+                LinearProgressIndicator(
+              value:
+                  progress.clamp(
+                0,
+                1,
+              ),
+
+              minHeight:
+                  10,
+
+              backgroundColor:
+                  Colors.white
+                      .withOpacity(
+                0.13,
+              ),
+
+              color:
+                  Colors.white,
+            ),
+          ),
+
+          const SizedBox(
+            height: 14,
+          ),
+
+          Row(
+            children: [
+              Expanded(
+                child:
+                    _progressStat(
+                  icon:
+                      Icons.quiz_outlined,
+
+                  value:
+                      "$completed/$totalQuestions",
+
+                  label:
+                      "Questions",
+                ),
+              ),
+
+              Container(
+                width:
+                    1,
+
+                height:
+                    34,
+
+                color:
+                    Colors.white
+                        .withOpacity(
+                  0.16,
+                ),
+              ),
+
+              Expanded(
+                child:
+                    _progressStat(
+                  icon:
+                      Icons.backpack_outlined,
+
+                  value:
+                      "$unlocked/${kitImages.length}",
+
+                  label:
+                      "Kit items",
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _progressStat({
+    required IconData icon,
+    required String value,
+    required String label,
+  }) {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment.center,
+
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: Colors.white
+              .withOpacity(
+            0.90,
+          ),
+        ),
+
+        const SizedBox(
+          width: 8,
+        ),
+
+        Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+            TextWidget(
+              value,
+              size: 13,
+              weight:
+                  FontWeight.w900,
+              color:
+                  Colors.white,
+            ),
+
+            TextWidget(
+              label,
+              size: 10,
+              color: Colors.white
+                  .withOpacity(
+                0.62,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ===============================================================
+  // KIT HEADING
+  // ===============================================================
+
+  Widget _kitHeading({
+    required int unlocked,
+  }) {
+    return Row(
+      children: [
+        const Expanded(
+          child: TextWidget(
+            "Safety Kit",
+            size: 18,
+            weight:
+                FontWeight.w900,
+            color:
+                AppColor.text,
+          ),
+        ),
+
+        Container(
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 6,
+          ),
+
+          decoration:
+              BoxDecoration(
+            color:
+                AppColor.primarySoft,
+
+            borderRadius:
+                BorderRadius.circular(
+              999,
+            ),
+          ),
+
+          child:
+              TextWidget(
+            "$unlocked unlocked",
+            size:
+                10.5,
+            weight:
+                FontWeight.w800,
+            color:
+                AppColor.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===============================================================
+  // KIT LOCKER
+  // ===============================================================
+
+  Widget _kitLocker({
+    required int unlockedKits,
+  }) {
+    return ListView.separated(
+      scrollDirection:
+          Axis.horizontal,
+
+      physics:
+          const BouncingScrollPhysics(),
+
+      itemCount:
+          kitImages.length,
+
+      separatorBuilder:
+          (_, __) =>
+              const SizedBox(
+        width: 12,
+      ),
+
+      itemBuilder:
+          (_, index) {
+        final unlocked =
+            index <
+                unlockedKits;
+
+        return TweenAnimationBuilder<
+            double>(
+          duration: Duration(
+            milliseconds:
+                350 +
+                    (index *
+                        70),
+          ),
+
+          tween:
+              Tween(
+            begin: 0,
+            end: 1,
+          ),
+
+          curve:
+              Curves.easeOutCubic,
+
+          builder:
+              (_, value, child) {
+            return Opacity(
+              opacity:
+                  value,
+
+              child:
+                  Transform.translate(
+                offset:
+                    Offset(
+                  12 *
+                      (1 -
+                          value),
+                  0,
+                ),
+
+                child:
+                    child,
+              ),
+            );
+          },
+
+          child:
+              _kitCard(
+            image:
+                kitImages[index],
+            number:
+                index + 1,
+            unlocked:
+                unlocked,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _kitCard({
+    required String image,
+    required int number,
+    required bool unlocked,
+  }) {
+    return Container(
+      width: 152,
+
+      padding:
+          const EdgeInsets.all(
+        14,
+      ),
+
+      decoration:
+          BoxDecoration(
+        color:
+            AppColor.surface,
+
+        borderRadius:
+            BorderRadius.circular(
+          22,
+        ),
+
+        border:
+            Border.all(
+          color: unlocked
+              ? AppColor
+                  .primary
+                  .withOpacity(
+                    0.16,
+                  )
+              : AppColor
+                  .border,
+        ),
+
+        boxShadow: [
+          BoxShadow(
+            color:
+                AppColor.shadow,
+
+            blurRadius:
+                15,
+
+            offset:
+                const Offset(
+              0,
+              7,
+            ),
+          ),
+        ],
+      ),
+
+      child:
+          Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+
+        children: [
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
+
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal:
+                      8,
+                  vertical:
+                      5,
+                ),
+
+                decoration:
+                    BoxDecoration(
+                  color:
+                      AppColor.inputFill,
+
+                  borderRadius:
+                      BorderRadius.circular(
+                    999,
+                  ),
+                ),
+
+                child:
+                    TextWidget(
+                  "KIT $number",
+                  size:
+                      9.5,
+                  weight:
+                      FontWeight.w800,
+                  color:
+                      AppColor.textMuted,
+                ),
+              ),
+
+              Container(
+                width:
+                    30,
+
+                height:
+                    30,
+
+                decoration:
+                    BoxDecoration(
+                  color: unlocked
+                      ? AppColor
+                          .safeSoft
+                      : AppColor
+                          .inputFill,
+
+                  shape:
+                      BoxShape.circle,
+                ),
+
+                child:
+                    Icon(
+                  unlocked
+                      ? Icons
+                          .check_rounded
+                      : Icons
+                          .lock_outline_rounded,
+
+                  size:
+                      16,
+
+                  color: unlocked
+                      ? AppColor
+                          .safeGreen
+                      : AppColor
+                          .textMuted,
+                ),
+              ),
+            ],
+          ),
+
+          const Spacer(),
+
+          Center(
+            child:
+                AnimatedOpacity(
+              opacity:
+                  unlocked
+                      ? 1
+                      : 0.20,
+
+              duration:
+                  const Duration(
+                milliseconds:
+                    180,
+              ),
+
+              child:
+                  Image.asset(
+                image,
+                height:
+                    78,
+
+                fit:
+                    BoxFit.contain,
+              ),
+            ),
+          ),
+
+          const Spacer(),
+
+          TextWidget(
+            unlocked
+                ? "Unlocked"
+                : "Locked",
+
+            size:
+                12,
+
+            weight:
+                FontWeight.w800,
+
+            color: unlocked
+                ? AppColor
+                    .safeGreen
+                : AppColor
+                    .textMuted,
+          ),
+
+          const SizedBox(
+            height: 3,
+          ),
+
+          TextWidget(
+            unlocked
+                ? "Added to your kit"
+                : "Complete question ${number.clamp(1, 5)}",
+
+            size:
+                10.5,
+
+            color:
+                AppColor.textMuted,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // EMPTY QUESTIONS
+  // ===============================================================
+
+  Widget _emptyQuestionsState() {
+    return Container(
+      width: double.infinity,
+
+      padding:
+          const EdgeInsets.all(
+        22,
+      ),
+
+      decoration:
+          BoxDecoration(
+        color:
+            AppColor.surface,
+
+        borderRadius:
+            BorderRadius.circular(
+          22,
+        ),
+
+        border:
+            Border.all(
+          color:
+              AppColor.border,
+        ),
+      ),
+
+      child: Column(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+
+        children: const [
+          Icon(
+            Icons
+                .inventory_2_outlined,
+            size: 42,
+            color:
+                AppColor.textMuted,
+          ),
+
+          SizedBox(
+            height: 12,
+          ),
+
+          TextWidget(
+            "No questions found",
+            size: 16,
+            weight:
+                FontWeight.w800,
+            color:
+                AppColor.text,
+          ),
+
+          SizedBox(
+            height: 5,
+          ),
+
+          TextWidget(
+            "Quiz content is not available for this category.",
+            size: 12,
+            color:
+                AppColor.textMuted,
+            align:
+                TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // START QUIZ BUTTON
+  // ===============================================================
+
+  Widget _startButton({
+    required bool allKitsUnlocked,
+    required int totalQuestions,
+    required Future<void> Function()
+        onPressed,
+  }) {
+    final disabled =
+        allKitsUnlocked ||
+            totalQuestions == 0;
+
+    return SizedBox(
+      width:
+          double.infinity,
+      height:
+          58,
+
+      child:
+          ElevatedButton(
+        style:
+            ElevatedButton.styleFrom(
+          backgroundColor:
+              allKitsUnlocked
+                  ? AppColor
+                      .safeGreen
+                  : AppColor
+                      .primary,
+
+          disabledBackgroundColor:
+              allKitsUnlocked
+                  ? AppColor
+                      .safeGreen
+                      .withOpacity(
+                        0.55,
+                      )
+                  : Colors
+                      .grey
+                      .shade300,
+
+          elevation:
+              disabled
+                  ? 0
+                  : 8,
+
+          shadowColor:
+              AppColor.primary
+                  .withOpacity(
+            0.20,
+          ),
+
+          shape:
+              RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(
+              18,
+            ),
+          ),
+        ),
+
+        onPressed: disabled
+            ? null
+            : () async {
+                await onPressed();
+              },
+
+        child:
+            Row(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+
+          children: [
+            Icon(
+              allKitsUnlocked
+                  ? Icons
+                      .verified_rounded
+                  : Icons
+                      .play_arrow_rounded,
+
+              color:
+                  Colors.white,
+
+              size:
+                  22,
+            ),
+
+            const SizedBox(
+              width: 8,
+            ),
+
+            TextWidget(
+              allKitsUnlocked
+                  ? "CATEGORY COMPLETED"
+                  : "START QUIZ",
+
+              size:
+                  14,
+
+              weight:
+                  FontWeight.w900,
+
+              color:
+                  Colors.white,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // UI shown when no items are unlocked yet
-  Widget _emptyState({required int totalQuestions}) {
-    final subtitle = totalQuestions == 0
-        ? "No questions found for this category."
-        : "Answer questions to unlock safety kit items.";
+  // ===============================================================
+  // LOADING STATE
+  // ===============================================================
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.70),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColor.border),
+  Widget _loadingState() {
+    return const Center(
+      child:
+          CircularProgressIndicator(
+        color:
+            AppColor.primary,
       ),
-      child: Row(
-        children: [
+    );
+  }
+
+  // ===============================================================
+  // ERROR STATE
+  // ===============================================================
+
+  Widget _errorState({
+    required String title,
+    required String message,
+  }) {
+    return Center(
+      child:
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColor.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColor.primary.withOpacity(0.18),
+        width:
+            double.infinity,
+
+        padding:
+            const EdgeInsets.all(
+          22,
+        ),
+
+        decoration:
+            BoxDecoration(
+          color:
+              AppColor.surface,
+
+          borderRadius:
+              BorderRadius.circular(
+            22,
+          ),
+
+          border:
+              Border.all(
+            color: AppColor
+                .danger
+                .withOpacity(
+              0.20,
+            ),
+          ),
+        ),
+
+        child:
+            Column(
+          mainAxisSize:
+              MainAxisSize.min,
+
+          children: [
+            Container(
+              width:
+                  56,
+              height:
+                  56,
+
+              decoration:
+                  BoxDecoration(
+                color:
+                    AppColor.dangerSoft,
+
+                borderRadius:
+                    BorderRadius.circular(
+                  18,
+                ),
+              ),
+
+              child:
+                  const Icon(
+                Icons
+                    .error_outline_rounded,
+                color:
+                    AppColor.danger,
+                size:
+                    28,
               ),
             ),
-            child: const Icon(
-              Icons.lock_rounded,
-              color: AppColor.primary,
+
+            const SizedBox(
+              height:
+                  14,
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "No items unlocked yet",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: AppColor.text,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColor.textMuted,
-                  ),
-                ),
-              ],
+
+            TextWidget(
+              title,
+              size:
+                  16,
+              weight:
+                  FontWeight.w900,
+              color:
+                  AppColor.text,
+              align:
+                  TextAlign.center,
             ),
-          ),
-        ],
+
+            const SizedBox(
+              height:
+                  7,
+            ),
+
+            TextWidget(
+              message,
+              size:
+                  11.5,
+              color:
+                  AppColor.textMuted,
+              align:
+                  TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

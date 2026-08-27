@@ -1,11 +1,10 @@
+// lib/widgets/badge_chip.dart
+
 import 'package:flutter/material.dart';
+
 import '../config/colors.dart';
 import 'text_widget.dart';
 
-/// BadgeChip is a small reusable UI component used
-/// to display short labels with an icon. It can be used
-/// to represent achievements, alerts, or status indicators
-/// inside the application interface.
 class BadgeChip extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -21,61 +20,118 @@ class BadgeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.all(6),
 
-      /// Margin around the chip to separate it from other elements
-      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(
+        10,
+        8,
+        14,
+        8,
+      ),
 
-      /// Padding inside the chip
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-
-      /// Styling of the chip container
       decoration: BoxDecoration(
-        color: AppColor.cardFill,
+        color: AppColor.surface,
 
-        /// Border color changes depending on the chip type
-        border: Border.all(color: color.withOpacity(0.35)),
+        borderRadius: BorderRadius.circular(16),
 
-        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColor.border,
+        ),
 
-        /// Light shadow effect for depth
         boxShadow: [
           BoxShadow(
             color: AppColor.shadow,
-            blurRadius: 14,
-            offset: const Offset(0, 10),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
 
-      /// Layout containing the icon and label
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // =====================================================
+          // MEDAL ICON
+          // =====================================================
 
-          /// Icon container
           Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
+            width: 38,
+            height: 38,
 
-              /// Light background for icon
-              color: color.withOpacity(0.12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
 
               borderRadius: BorderRadius.circular(12),
+
+              border: Border.all(
+                color: color.withOpacity(0.14),
+              ),
             ),
 
-            /// Icon representing the chip category
-            child: Icon(icon, color: color, size: 18),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: color,
+                  size: 22,
+                ),
+
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+
+                      border: Border.all(
+                        color: AppColor.surface,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(width: 10),
 
-          /// Text label describing the badge
+          // =====================================================
+          // LABEL
+          // =====================================================
+
           TextWidget(
             label,
-            color: color,
-            size: 14,
+            size: 13,
             weight: FontWeight.w800,
+            color: AppColor.text,
+          ),
+
+          const SizedBox(width: 8),
+
+          // =====================================================
+          // ACHIEVEMENT MARKER
+          // =====================================================
+
+          Container(
+            width: 22,
+            height: 22,
+
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+
+            child: Icon(
+              Icons.check_rounded,
+              size: 14,
+              color: color,
+            ),
           ),
         ],
       ),

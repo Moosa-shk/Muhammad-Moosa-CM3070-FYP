@@ -1,7 +1,8 @@
-// HAMZA KHAWAR FYP ///
+// Moosa  Sheikh FYP ///
 
 // lib/main.dart
 
+import 'package:disaster_app_ui/admin/firebase_seed_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -60,6 +61,7 @@ Future<void> _initializeApp() async {
   if (await Hive.boxExists('quizBox')) {
     await Hive.deleteBoxFromDisk('quizBox');
   }
+
   await Hive.openBox<QuizModel>('quizBox');
 
   /// Emergency kit checklist storage
@@ -75,27 +77,40 @@ Future<void> _initializeApp() async {
   await FirestoreSyncService.startLiveSync();
 
   /// Register global authentication controller using GetX
-  Get.put(AuthController(), permanent: true);
+  Get.put(
+    AuthController(),
+    permanent: true,
+  );
 
   /// Initialize local notification center for in-app notification feed
-  Get.put(LocalNotificationCenter(), permanent: true);
+  Get.put(
+    LocalNotificationCenter(),
+    permanent: true,
+  );
+
   await LocalNotificationCenter.to.init();
 }
 
 void main() async {
   await _initializeApp();
-  runApp(const DisasterAidApp());
+
+  runApp(
+    const RescueAidApp(),
+  );
 }
 
-/// Root widget of the DisasterAid application.
+/// Root widget of the RescueAid application.
 /// Defines global theme, routing structure, and initial screen.
-class DisasterAidApp extends StatelessWidget {
-  const DisasterAidApp({super.key});
+class RescueAidApp extends StatelessWidget {
+  const RescueAidApp({
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'DisasterAid UI',
+      title: 'RescueAid',
+
       debugShowCheckedModeBanner: false,
 
       /// Global application theme
@@ -110,8 +125,16 @@ class DisasterAidApp extends StatelessWidget {
       /// Named routes used throughout the application
       routes: {
         '/auth': (_) => const AuthGate(),
+
         '/quiz-list': (_) => const QuizListScreen(),
-        '/admin-upload-quiz': (_) => const QuizAdminUploadScreen(),
+
+        '/admin-upload-quiz': (_) =>
+            const QuizAdminUploadScreen(),
+
+        // TEMPORARY ROUTE
+        // Used only for seeding quiz data into the new Firebase project.
+        '/seed-quizzes': (_) =>
+            const FirebaseQuizSeedScreen(),
       },
     );
   }

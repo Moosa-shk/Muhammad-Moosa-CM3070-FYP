@@ -81,15 +81,15 @@ class DefaultFirebaseOptions {
 
   // ============================================================
   // iOS
-  // Firebase App: disaster_app_new
+  // Firebase App: disaster-musa
   // ============================================================
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCQDY1SdNziWvzcsxZf-zwWdwDZZSI-WXQ',
-    appId: '1:229273857781:ios:c67497e4201872d8cfdfbc',
-    messagingSenderId: '229273857781',
-    projectId: 'disasterdemo-698bf',
-    storageBucket: 'disasterdemo-698bf.firebasestorage.app',
-    iosBundleId: 'com.hamzakhawar.disasterAid',
+    apiKey: 'AIzaSyDOSGn52nbDKs_jns4BWXk5zZ9zlgzGh0M',
+    appId: '1:125207350139:ios:492a01f33c8613b9b34bde',
+    messagingSenderId: '125207350139',
+    projectId: 'disaster-musa',
+    storageBucket: 'disaster-musa.firebasestorage.app',
+    iosBundleId: 'com.musa.disaster',
   );
 }

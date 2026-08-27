@@ -1,3 +1,5 @@
+// lib/screens/emergency/emergency_directory_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:get/get.dart';
@@ -6,11 +8,6 @@ import '../../config/colors.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/text_widget.dart';
 
-/// Emergency directory screen.
-/// This feature provides quick access to important emergency
-/// services such as police, fire brigade, ambulance, and
-/// disaster helplines. Users can search and directly call
-/// these numbers from within the application.
 class EmergencyDirectoryScreen extends StatefulWidget {
   const EmergencyDirectoryScreen({super.key});
 
@@ -19,14 +16,15 @@ class EmergencyDirectoryScreen extends StatefulWidget {
       _EmergencyDirectoryScreenState();
 }
 
-class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
-
-  /// Controller used for searching contacts in the directory
+class _EmergencyDirectoryScreenState
+    extends State<EmergencyDirectoryScreen> {
   final _searchC = TextEditingController();
 
-  /// Static list of emergency contacts used in the directory
-  final List<Map<String, dynamic>> _items = const [
+  // ===============================================================
+  // EXISTING EMERGENCY DATA
+  // ===============================================================
 
+  final List<Map<String, dynamic>> _items = const [
     {
       "cat": "Police",
       "title": "Police Emergency",
@@ -35,7 +33,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.local_police_rounded,
       "color": Color(0xFF2E5BFF),
     },
-
     {
       "cat": "Fire Brigade",
       "title": "Fire Brigade",
@@ -44,7 +41,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.local_fire_department_rounded,
       "color": Color(0xFFFF6B3D),
     },
-
     {
       "cat": "Ambulance / Rescue",
       "title": "Rescue 1122",
@@ -53,7 +49,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.emergency_rounded,
       "color": Color(0xFFE53935),
     },
-
     {
       "cat": "Ambulance / Rescue",
       "title": "Edhi Ambulance",
@@ -62,7 +57,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.local_hospital_rounded,
       "color": Color(0xFF4CAF50),
     },
-
     {
       "cat": "Ambulance / Rescue",
       "title": "Chhipa Ambulance",
@@ -71,7 +65,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.medical_services_rounded,
       "color": Color(0xFF00A86B),
     },
-
     {
       "cat": "Disaster Helplines",
       "title": "PDMA Helpline",
@@ -80,7 +73,6 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       "icon": Icons.warning_amber_rounded,
       "color": Color(0xFFFFB300),
     },
-
     {
       "cat": "Women & Child Safety",
       "title": "Women Helpline",
@@ -91,37 +83,39 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
     },
   ];
 
-  /// Returns the current search query
   String get _q => _searchC.text.trim().toLowerCase();
 
-  /// Filters directory items based on search query
   List<Map<String, dynamic>> get _filtered {
     if (_q.isEmpty) return _items;
 
     return _items.where((m) {
-      final t = "${m["title"]} ${m["subtitle"]} ${m["cat"]} ${m["phone"]}"
-          .toString()
-          .toLowerCase();
-      return t.contains(_q);
+      final text =
+          "${m["title"]} ${m["subtitle"]} ${m["cat"]} ${m["phone"]}"
+              .toLowerCase();
+
+      return text.contains(_q);
     }).toList();
   }
 
-  /// Groups contacts by their category (Police, Fire, etc.)
   Map<String, List<Map<String, dynamic>>> _groupByCategory(
     List<Map<String, dynamic>> list,
   ) {
-    final Map<String, List<Map<String, dynamic>>> out = {};
+    final Map<String, List<Map<String, dynamic>>> output = {};
 
-    for (final e in list) {
-      final c = (e["cat"] ?? "Other").toString();
-      out.putIfAbsent(c, () => []);
-      out[c]!.add(e);
+    for (final item in list) {
+      final category = (item["cat"] ?? "Other").toString();
+
+      output.putIfAbsent(category, () => []);
+      output[category]!.add(item);
     }
 
-    return out;
+    return output;
   }
 
-  /// Opens the phone dialer to call the selected emergency number
+  // ===============================================================
+  // CALL
+  // ===============================================================
+
   Future<void> _call(String phone) async {
     final uri = Uri.parse("tel:$phone");
     final ok = await canLaunchUrl(uri);
@@ -138,7 +132,10 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       return;
     }
 
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
   }
 
   @override
@@ -149,11 +146,12 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _groupByCategory(_filtered);
+    final filtered = _filtered;
+    final grouped = _groupByCategory(filtered);
 
     return AppScaffold(
-      title: "Emergency Directory",
-      subtitle: "Police, Fire, Rescue & Helplines",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: true,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -161,221 +159,617 @@ class _EmergencyDirectoryScreenState extends State<EmergencyDirectoryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 2),
 
-          const SizedBox(height: 6),
+          // =====================================================
+          // CUSTOM HEADER
+          // =====================================================
 
-          /// Search bar used to filter emergency contacts
+          _pageHeader(),
+
+          const SizedBox(height: 22),
+
+          // =====================================================
+          // EMERGENCY HERO
+          // =====================================================
+
+          _emergencyHero(),
+
+          const SizedBox(height: 22),
+
+          // =====================================================
+          // SEARCH
+          // =====================================================
+
           _searchBar(),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 25),
 
-          /// Display message if no search results are found
-          if (_filtered.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(
-                child: TextWidget(
-                  "No results found",
-                  color: AppColor.textMuted,
-                  weight: FontWeight.w800,
-                ),
-              ),
-            )
-          else
+          // =====================================================
+          // DIRECTORY HEADER
+          // =====================================================
 
-            /// Display grouped emergency contacts
-            ...grouped.entries.map((entry) {
-
-              final cat = entry.key;
-              final list = entry.value;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-
+          Row(
+            children: [
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-
                   children: [
-                    _sectionHeader(cat),
-
-                    const SizedBox(height: 12),
-
-                    ...list.map(_card),
+                    TextWidget(
+                      "Emergency Services",
+                      size: 18,
+                      weight: FontWeight.w900,
+                      color: AppColor.text,
+                    ),
+                    SizedBox(height: 3),
+                    TextWidget(
+                      "Tap any service to open the phone dialer",
+                      size: 11.5,
+                      color: AppColor.textMuted,
+                    ),
                   ],
                 ),
-              );
-            }),
+              ),
 
-          const SizedBox(height: 30),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.primarySoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: TextWidget(
+                  "${filtered.length}",
+                  size: 11,
+                  weight: FontWeight.w900,
+                  color: AppColor.primary,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // =====================================================
+          // EMPTY STATE
+          // =====================================================
+
+          if (filtered.isEmpty)
+            _emptyState()
+          else
+            ...grouped.entries.map(
+              (entry) => _categorySection(
+                entry.key,
+                entry.value,
+              ),
+            ),
+
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  /// Search input field for filtering contacts
-  Widget _searchBar() {
-    final radius = BorderRadius.circular(18);
+  // ===============================================================
+  // PAGE HEADER
+  // ===============================================================
 
-    return TextField(
-      controller: _searchC,
-      onChanged: (_) => setState(() {}),
-      cursorColor: AppColor.primary,
-      style: const TextStyle(
-        color: AppColor.text,
-        fontWeight: FontWeight.w700,
-      ),
+  Widget _pageHeader() {
+    return const SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          TextWidget(
+            "Emergency Directory",
+            size: 27,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+            align: TextAlign.center,
+          ),
 
-      decoration: InputDecoration(
-        hintText: "Search contacts (e.g., 1122, police, fire...)",
-        hintStyle: TextStyle(
-          color: AppColor.textMuted.withOpacity(0.75),
-          fontWeight: FontWeight.w700,
-        ),
+          SizedBox(height: 5),
 
-        prefixIcon: const Icon(Icons.search_rounded, color: AppColor.textMuted),
-        prefixIconConstraints: const BoxConstraints(minWidth: 52),
-
-        filled: true,
-        fillColor: AppColor.inputFill,
-
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-
-        border: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AppColor.border),
-        ),
-
-        enabledBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AppColor.border),
-        ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: const BorderSide(color: AppColor.border),
-        ),
+          TextWidget(
+            "Essential help, one tap away",
+            size: 12.5,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
 
-  /// Section header used to display each category
-  Widget _sectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 22,
-          decoration: BoxDecoration(
-            color: AppColor.primary,
-            borderRadius: BorderRadius.circular(6),
+  // ===============================================================
+  // EMERGENCY HERO
+  // ===============================================================
+
+  Widget _emergencyHero() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColor.secondary,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.secondary.withOpacity(0.16),
+            blurRadius: 22,
+            offset: const Offset(0, 11),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(
+                  Icons.sos_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "Need urgent help?",
+                      size: 16,
+                      weight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+
+                    SizedBox(height: 4),
+
+                    TextWidget(
+                      "Call Rescue 1122 for emergency assistance",
+                      size: 11.5,
+                      color: Color(0xCFFFFFFF),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _call("1122"),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Row(
+                  children: [
+                    ContainerCallIcon(),
+
+                    SizedBox(width: 11),
+
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextWidget(
+                            "CALL RESCUE 1122",
+                            size: 12.5,
+                            weight: FontWeight.w900,
+                            color: AppColor.text,
+                          ),
+                          SizedBox(height: 1),
+                          TextWidget(
+                            "Ambulance & rescue",
+                            size: 9.5,
+                            color: AppColor.textMuted,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 20,
+                      color: AppColor.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // SEARCH BAR
+  // ===============================================================
+
+  Widget _searchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(17),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.shadow,
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchC,
+        onChanged: (_) => setState(() {}),
+        cursorColor: AppColor.primary,
+        style: const TextStyle(
+          color: AppColor.text,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+        decoration: InputDecoration(
+          hintText: "Search service or number",
+          hintStyle: TextStyle(
+            color: AppColor.textMuted.withOpacity(0.75),
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+          ),
+
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppColor.primarySoft,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(
+              Icons.search_rounded,
+              color: AppColor.primary,
+              size: 20,
+            ),
+          ),
+
+          suffixIcon: _q.isNotEmpty
+              ? IconButton(
+                  onPressed: () {
+                    _searchC.clear();
+                    setState(() {});
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: AppColor.textMuted,
+                    size: 19,
+                  ),
+                )
+              : null,
+
+          filled: true,
+          fillColor: AppColor.surface,
+
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 17,
+          ),
+
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: const BorderSide(
+              color: AppColor.border,
+            ),
+          ),
+
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: const BorderSide(
+              color: AppColor.border,
+            ),
+          ),
+
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(17),
+            borderSide: BorderSide(
+              color: AppColor.primary.withOpacity(0.45),
+              width: 1.3,
+            ),
           ),
         ),
-        const SizedBox(width: 10),
-        TextWidget(title, weight: FontWeight.w900, size: 16),
-      ],
+      ),
     );
   }
 
-  /// Card widget representing a single emergency contact
-  Widget _card(Map<String, dynamic> e) {
+  // ===============================================================
+  // CATEGORY SECTION
+  // ===============================================================
 
-    final Color c = (e["color"] as Color?) ?? AppColor.primary;
-    final IconData icon = (e["icon"] as IconData?) ?? Icons.phone_rounded;
+  Widget _categorySection(
+    String category,
+    List<Map<String, dynamic>> items,
+  ) {
+    final firstColor =
+        (items.first["color"] as Color?) ?? AppColor.primary;
 
-    return GestureDetector(
-      onTap: () => _call(e["phone"].toString()),
-
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-
-        decoration: BoxDecoration(
-          color: AppColor.cardFill,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColor.border),
-
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-
-          children: [
-
-            /// Icon representing the emergency service
-            Container(
-              width: 50,
-              height: 50,
-
-              decoration: BoxDecoration(
-                color: c.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: c.withOpacity(0.18)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: firstColor,
+                  shape: BoxShape.circle,
+                ),
               ),
 
-              child: Icon(icon, color: c, size: 26),
-            ),
+              const SizedBox(width: 9),
 
-            const SizedBox(width: 14),
-
-            /// Contact information
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-                  TextWidget(
-                    e["title"].toString(),
-                    size: 15,
-                    weight: FontWeight.w900,
-                    color: AppColor.text,
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  TextWidget(
-                    e["subtitle"].toString(),
-                    size: 13,
-                    color: AppColor.textMuted,
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-
-                    decoration: BoxDecoration(
-                      color: c.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: c.withOpacity(0.18)),
-                    ),
-
-                    child: TextWidget(
-                      "Call: ${e["phone"]}",
-                      size: 12,
-                      weight: FontWeight.w900,
-                      color: c,
-                    ),
-                  ),
-                ],
+              Expanded(
+                child: TextWidget(
+                  category,
+                  size: 14,
+                  weight: FontWeight.w900,
+                  color: AppColor.text,
+                ),
               ),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColor.inputFill,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: TextWidget(
+                  "${items.length}",
+                  size: 9.5,
+                  weight: FontWeight.w800,
+                  color: AppColor.textMuted,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 11),
+
+          ...items.map(_card),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // CONTACT CARD
+  // ===============================================================
+
+  Widget _card(Map<String, dynamic> item) {
+    final Color color =
+        (item["color"] as Color?) ?? AppColor.primary;
+
+    final IconData icon =
+        (item["icon"] as IconData?) ?? Icons.phone_rounded;
+
+    final phone = item["phone"].toString();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _call(phone),
+          borderRadius: BorderRadius.circular(19),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(19),
+              border: Border.all(
+                color: AppColor.border,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColor.shadow,
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
+            child: Row(
+              children: [
+                // SERVICE ICON
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.09),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 24,
+                  ),
+                ),
 
-            const SizedBox(width: 10),
+                const SizedBox(width: 13),
 
-            Icon(Icons.call_rounded, color: c),
-          ],
+                // DETAILS
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextWidget(
+                        item["title"].toString(),
+                        size: 14,
+                        weight: FontWeight.w900,
+                        color: AppColor.text,
+                      ),
+
+                      const SizedBox(height: 3),
+
+                      TextWidget(
+                        item["subtitle"].toString(),
+                        size: 10.5,
+                        color: AppColor.textMuted,
+                      ),
+
+                      const SizedBox(height: 7),
+
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_in_talk_outlined,
+                            color: color,
+                            size: 14,
+                          ),
+
+                          const SizedBox(width: 5),
+
+                          TextWidget(
+                            phone,
+                            size: 11.5,
+                            weight: FontWeight.w900,
+                            color: color,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // CALL BUTTON
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.20),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.call_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // EMPTY SEARCH STATE
+  // ===============================================================
+
+  Widget _emptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 36,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColor.border,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: const BoxDecoration(
+              color: AppColor.primarySoft,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.search_off_rounded,
+              color: AppColor.primary,
+              size: 27,
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          const TextWidget(
+            "No services found",
+            size: 15,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+          ),
+
+          const SizedBox(height: 5),
+
+          const TextWidget(
+            "Try searching by service name or emergency number.",
+            size: 11,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =================================================================
+// SMALL HERO CALL ICON
+// =================================================================
+
+class ContainerCallIcon extends StatelessWidget {
+  const ContainerCallIcon({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: const BoxDecoration(
+        color: AppColor.primarySoft,
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        Icons.call_rounded,
+        color: AppColor.primary,
+        size: 18,
       ),
     );
   }

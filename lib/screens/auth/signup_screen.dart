@@ -1,27 +1,4 @@
-// ===============================================================
-// signup_screen.dart
-// ---------------------------------------------------------------
-// This screen allows a new user to create an account for the
-// application. The user provides personal information such as:
-//
-// • Full Name
-// • Email
-// • Password
-// • Phone Number
-// • Emergency Contact
-// • Blood Group
-// • Profile Image
-//
-// The collected data is sent to Firebase Authentication for
-// account creation and stored in Firestore as a user profile.
-//
-// Profile images are uploaded to Cloudinary and the returned
-// URL is saved with the user profile.
-//
-// This information is important for emergency situations,
-// allowing responders or contacts to quickly access critical
-// user details.
-// ===============================================================
+// lib/screens/auth/signup_screen.dart
 
 import 'dart:io';
 
@@ -31,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../config/colors.dart';
+import '../../widgets/text_widget.dart';
 import 'animated_auth_scaffold.dart';
 import '../dashboard/home_screen.dart';
 import 'auth_controller.dart';
@@ -43,29 +21,17 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-
-  /// Controllers for user input fields
   final name = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
   final phone = TextEditingController();
   final emergency = TextEditingController();
 
-  /// Selected blood group
   String bloodGroup = "A+";
 
-  /// Selected profile photo (optional)
   File? photo;
 
-  /// Indicates whether signup is currently processing
   bool loading = false;
-
-  // ===============================================================
-  // dispose()
-  // ---------------------------------------------------------------
-  // Cleans up controllers to avoid memory leaks when the widget
-  // is removed from the widget tree.
-  // ===============================================================
 
   @override
   void dispose() {
@@ -78,32 +44,29 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ===============================================================
-  // pickImage()
-  // ---------------------------------------------------------------
-  // Opens the device gallery and allows the user to select
-  // a profile image.
+  // IMAGE PICKER - PRESERVED
   // ===============================================================
 
   Future<void> pickImage() async {
-    final img = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final img = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+    );
 
     if (img != null) {
-      setState(() => photo = File(img.path));
+      setState(() {
+        photo = File(img.path);
+      });
     }
   }
 
   // ===============================================================
-  // _validate()
-  // ---------------------------------------------------------------
-  // Ensures that required fields are not empty before allowing
-  // the signup process to start.
+  // VALIDATION - PRESERVED
   // ===============================================================
 
   bool _validate() {
     if (name.text.trim().isEmpty ||
         email.text.trim().isEmpty ||
         password.text.trim().isEmpty) {
-
       Get.snackbar(
         "Missing Fields",
         "Name, email and password required",
@@ -116,19 +79,15 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ===============================================================
-  // SIGNUP FUNCTION
-  // ---------------------------------------------------------------
-  // Sends the entered user data to AuthController which performs:
-  // 1. Firebase account creation
-  // 2. Profile image upload
-  // 3. Firestore user profile storage
+  // SIGNUP - PRESERVED
   // ===============================================================
 
   Future<void> _signup() async {
-
     if (!_validate()) return;
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     final err = await AuthController.to.registerFull(
       email: email.text.trim(),
@@ -140,9 +99,12 @@ class _SignupScreenState extends State<SignupScreen> {
       profileFile: photo,
     );
 
-    setState(() => loading = false);
+    if (!mounted) return;
 
-    // Show error message if signup fails
+    setState(() {
+      loading = false;
+    });
+
     if (err != null) {
       Get.snackbar(
         "Signup Failed",
@@ -153,7 +115,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    // Navigate to main application after successful signup
     Get.offAll(
       () => const HomeScreen(),
       transition: Transition.fadeIn,
@@ -161,178 +122,337 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // ===============================================================
-  // UI BUILD
+  // BUILD
   // ===============================================================
 
   @override
   Widget build(BuildContext context) {
-
     return AnimatedAuthScaffold(
       showBack: true,
-      title: "Create account",
-      subtitle: "Set up your safety profile",
+      title: null,
+      subtitle: null,
       scroll: true,
-
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 8),
 
-          const SizedBox(height: 12),
+          // =====================================================
+          // PAGE TITLE
+          // =====================================================
 
-          // ===============================================================
-          // PROFILE IMAGE PICKER
-          // ===============================================================
+          const TextWidget(
+            "Create account",
+            size: 28,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+          ),
 
-          _AvatarPicker(photo: photo, onTap: pickImage),
+          const SizedBox(height: 6),
 
-          const SizedBox(height: 18),
-
-          // ===============================================================
-          // SIGNUP FORM
-          // ===============================================================
-
-          AuthGlassCard(
-            child: Column(
-              children: [
-
-                AuthField(
-                  controller: name,
-                  label: "Full Name",
-                  icon: Icons.person_rounded,
-                  textInputAction: TextInputAction.next,
-                ),
-
-                const SizedBox(height: 14),
-
-                AuthField(
-                  controller: email,
-                  label: "Email",
-                  icon: Icons.email_rounded,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                ),
-
-                const SizedBox(height: 14),
-
-                AuthField(
-                  controller: password,
-                  label: "Password",
-                  icon: Icons.lock_rounded,
-                  obscureText: true,
-                  textInputAction: TextInputAction.next,
-                ),
-
-                const SizedBox(height: 14),
-
-                AuthField(
-                  controller: phone,
-                  label: "Phone",
-                  icon: Icons.phone_rounded,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                ),
-
-                const SizedBox(height: 14),
-
-                AuthField(
-                  controller: emergency,
-                  label: "Emergency Contact",
-                  icon: Icons.emergency_rounded,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-
-                  /// Allow signup submission when pressing Enter
-                  onSubmitted: (_) => loading ? null : _signup(),
-                ),
-
-                const SizedBox(height: 14),
-
-                // ===============================================================
-                // BLOOD GROUP SELECTOR
-                // ===============================================================
-
-                AuthBloodDropdown(
-                  value: bloodGroup,
-                  onChanged: (v) => setState(() => bloodGroup = v),
-                ),
-
-                const SizedBox(height: 18),
-
-                // ===============================================================
-                // SIGNUP BUTTON
-                // ===============================================================
-
-                AuthPrimaryButton(
-                  title: "Sign Up",
-                  loading: loading,
-                  onTap: loading ? null : _signup,
-                ),
-              ],
-            ),
+          const TextWidget(
+            "Add your details to get started.",
+            size: 13.5,
+            weight: FontWeight.w500,
+            color: AppColor.textMuted,
           ),
 
           const SizedBox(height: 26),
+
+          // =====================================================
+          // PROFILE PHOTO
+          // =====================================================
+
+          _ProfilePhotoRow(
+            photo: photo,
+            onTap: pickImage,
+          ),
+
+          const SizedBox(height: 30),
+
+          // =====================================================
+          // ACCOUNT SECTION
+          // =====================================================
+
+          const _SectionLabel(
+            title: "Account",
+          ),
+
+          const SizedBox(height: 12),
+
+          AuthField(
+            controller: name,
+            label: "Full name",
+            icon: Icons.person_outline_rounded,
+            textInputAction: TextInputAction.next,
+          ),
+
+          const SizedBox(height: 14),
+
+          AuthField(
+            controller: email,
+            label: "Email address",
+            icon: Icons.alternate_email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+          ),
+
+          const SizedBox(height: 14),
+
+          AuthField(
+            controller: password,
+            label: "Password",
+            icon: Icons.lock_outline_rounded,
+            obscureText: true,
+            textInputAction: TextInputAction.next,
+          ),
+
+          const SizedBox(height: 28),
+
+          // =====================================================
+          // CONTACT & SAFETY SECTION
+          // =====================================================
+
+          const _SectionLabel(
+            title: "Contact & safety",
+          ),
+
+          const SizedBox(height: 12),
+
+          AuthField(
+            controller: phone,
+            label: "Phone number",
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+          ),
+
+          const SizedBox(height: 14),
+
+          AuthField(
+            controller: emergency,
+            label: "Emergency contact",
+            icon: Icons.contact_phone_outlined,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (!loading) {
+                _signup();
+              }
+            },
+          ),
+
+          const SizedBox(height: 14),
+
+          _bloodGroupField(),
+
+          const SizedBox(height: 30),
+
+          // =====================================================
+          // CTA
+          // =====================================================
+
+          AuthPrimaryButton(
+            title: "Create account",
+            loading: loading,
+            onTap: loading ? null : _signup,
+          ),
+
+          const SizedBox(height: 30),
         ],
       ),
     );
   }
+
+  // ===============================================================
+  // BLOOD GROUP
+  // ===============================================================
+
+  Widget _bloodGroupField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const TextWidget(
+          "Blood group",
+          size: 12,
+          weight: FontWeight.w800,
+          color: AppColor.text,
+        ),
+
+        const SizedBox(height: 8),
+
+        AuthBloodDropdown(
+          value: bloodGroup,
+          onChanged: (value) {
+            setState(() {
+              bloodGroup = value;
+            });
+          },
+        ),
+      ],
+    );
+  }
 }
 
-// ===============================================================
-// AVATAR PICKER WIDGET
-// ---------------------------------------------------------------
-// Displays the user's profile image and allows them to select
-// a new one from the device gallery.
-// ===============================================================
+// =================================================================
+// SECTION LABEL
+// =================================================================
 
-class _AvatarPicker extends StatelessWidget {
-  const _AvatarPicker({required this.photo, required this.onTap});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({
+    required this.title,
+  });
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        TextWidget(
+          title,
+          size: 14.5,
+          weight: FontWeight.w900,
+          color: AppColor.text,
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppColor.border,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =================================================================
+// PROFILE PHOTO
+// =================================================================
+
+class _ProfilePhotoRow extends StatelessWidget {
+  const _ProfilePhotoRow({
+    required this.photo,
+    required this.onTap,
+  });
 
   final File? photo;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ---------------------------------------------------------
+        // PHOTO
+        // ---------------------------------------------------------
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
+        GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColor.border,
+                  ),
+                ),
+                padding: const EdgeInsets.all(3),
+                child: ClipOval(
+                  child: photo != null
+                      ? Image.file(
+                          photo!,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          color: AppColor.inputFill,
+                          child: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 30,
+                            color: AppColor.textMuted,
+                          ),
+                        ),
+                ),
+              ),
 
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColor.primary.withOpacity(0.25),
-              AppColor.primary.withOpacity(0.70),
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColor.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColor.bg,
+                      width: 3,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.add_a_photo_outlined,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ],
           ),
-
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 22,
-              offset: const Offset(0, 12),
-              color: AppColor.primary.withOpacity(0.18),
-            ),
-          ],
         ),
 
-        child: CircleAvatar(
-          radius: 46,
-          backgroundColor: Colors.white.withOpacity(0.90),
-          backgroundImage: photo != null ? FileImage(photo!) : null,
+        const SizedBox(width: 16),
 
-          child: photo == null
-              ? Icon(
-                  Icons.camera_alt_rounded,
-                  color: AppColor.primary.withOpacity(0.90),
-                  size: 32,
-                )
-              : null,
+        // ---------------------------------------------------------
+        // TEXT
+        // ---------------------------------------------------------
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TextWidget(
+                "Profile photo",
+                size: 14,
+                weight: FontWeight.w800,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 4),
+
+              TextWidget(
+                photo == null
+                    ? "Optional"
+                    : "Photo selected",
+                size: 12,
+                color: AppColor.textMuted,
+              ),
+
+              const SizedBox(height: 7),
+
+              GestureDetector(
+                onTap: onTap,
+                child: const TextWidget(
+                  "Choose photo",
+                  size: 12,
+                  weight: FontWeight.w900,
+                  color: AppColor.primary,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

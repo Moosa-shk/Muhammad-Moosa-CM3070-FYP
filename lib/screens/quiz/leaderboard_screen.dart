@@ -5,10 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../config/colors.dart';
-
-/// Leaderboard screen shows the top users based on total XP.
-/// Data is fetched from Firestore and displayed with a podium
-/// for the top 3 users and a ranked list for the rest.
+import '../../widgets/text_widget.dart';
 
 class LeaderboardScreen extends StatelessWidget {
   const LeaderboardScreen({super.key});
@@ -16,248 +13,818 @@ class LeaderboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "Leaderboard",
-      subtitle: "Top responders worldwide",
+      title: null,
+      subtitle: null,
       showBack: true,
       scroll: true,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .orderBy('totalXP', descending: true)
-            .limit(50)
-            .snapshots(),
-        builder: (_, snap) {
-          if (!snap.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColor.primary),
-            );
-          }
 
-          final users = snap.data!.docs;
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 2),
 
-          if (users.isEmpty) {
-            return const Center(child: Text("No leaderboard data"));
-          }
+          // =======================================================
+          // CUSTOM PAGE HEADER
+          // =======================================================
 
-          final top3 = users.take(3).toList();
-          final rest = users.skip(3).toList();
+          _pageHeader(),
 
-          return Column(
-            children: [
-              _TopPodium(users: top3),
-              const SizedBox(height: 28),
+          const SizedBox(height: 24),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "Global Rankings",
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: AppColor.text,
-                      ),
-                ),
-              ),
+          // =======================================================
+          // FIRESTORE LEADERBOARD
+          // BACKEND QUERY PRESERVED
+          // =======================================================
 
-              const SizedBox(height: 14),
-
-              ...rest.asMap().entries.map((entry) {
-                final rank = entry.key + 4;
-                final data = entry.value.data() as Map<String, dynamic>;
-
-                return _LeaderboardTile(
-                  rank: rank,
-                  name: data['name'] ?? 'User',
-                  xp: data['totalXP'] ?? 0,
-                  image: data['profileImage'],
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .orderBy(
+                  'totalXP',
+                  descending: true,
+                )
+                .limit(50)
+                .snapshots(),
+            builder: (_, snap) {
+              if (!snap.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.only(
+                    top: 90,
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: AppColor.primary,
+                    ),
+                  ),
                 );
-              }),
+              }
 
-              const SizedBox(height: 26),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
+              final users = snap.data!.docs;
 
-/// Widget displaying the top 3 ranked users in podium style
-class _TopPodium extends StatelessWidget {
-  final List<QueryDocumentSnapshot> users;
+              if (users.isEmpty) {
+                return _emptyState();
+              }
 
-  const _TopPodium({required this.users});
+              final first =
+                  users.isNotEmpty ? users[0] : null;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 22),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColor.primary.withOpacity(0.16),
-            AppColor.safeGreen.withOpacity(0.12),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppColor.primary.withOpacity(0.22)),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 22,
-            color: Colors.black.withOpacity(0.08),
-            offset: const Offset(0, 12),
+              final second =
+                  users.length > 1 ? users[1] : null;
+
+              final third =
+                  users.length > 2 ? users[2] : null;
+
+              final rest =
+                  users.skip(3).toList();
+
+              return Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  // =================================================
+                  // CHAMPION
+                  // =================================================
+
+                  if (first != null)
+                    _ChampionCard(
+                      user: first,
+                    ),
+
+                  const SizedBox(height: 14),
+
+                  // =================================================
+                  // SECOND + THIRD
+                  // =================================================
+
+                  if (second != null ||
+                      third != null)
+                    Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        if (second != null)
+                          Expanded(
+                            child:
+                                _RunnerCard(
+                              rank: 2,
+                              user: second,
+                            ),
+                          ),
+
+                        if (second != null &&
+                            third != null)
+                          const SizedBox(
+                            width: 12,
+                          ),
+
+                        if (third != null)
+                          Expanded(
+                            child:
+                                _RunnerCard(
+                              rank: 3,
+                              user: third,
+                            ),
+                          ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 30),
+
+                  // =================================================
+                  // RANKINGS HEADER
+                  // =================================================
+
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
+                          children: [
+                            TextWidget(
+                              "Global Rankings",
+                              size: 18,
+                              weight:
+                                  FontWeight.w900,
+                              color:
+                                  AppColor.text,
+                            ),
+                            SizedBox(
+                              height: 3,
+                            ),
+                            TextWidget(
+                              "Top responders by earned XP",
+                              size: 11.5,
+                              color: AppColor
+                                  .textMuted,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      Container(
+                        padding:
+                            const EdgeInsets
+                                .symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color: AppColor
+                              .primarySoft,
+                          borderRadius:
+                              BorderRadius.circular(
+                            999,
+                          ),
+                        ),
+                        child: TextWidget(
+                          "${users.length}",
+                          size: 11,
+                          weight:
+                              FontWeight.w900,
+                          color:
+                              AppColor.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // =================================================
+                  // REST OF USERS
+                  // =================================================
+
+                  if (rest.isEmpty)
+                    _topThreeOnly()
+                  else
+                    ...rest
+                        .asMap()
+                        .entries
+                        .map(
+                      (entry) {
+                        final rank =
+                            entry.key + 4;
+
+                        final data =
+                            entry.value.data()
+                                as Map<String,
+                                    dynamic>;
+
+                        return _RankingRow(
+                          rank: rank,
+                          name: data['name'] ??
+                              'User',
+                          xp:
+                              data['totalXP'] ??
+                                  0,
+                          image: data[
+                              'profileImage'],
+                        );
+                      },
+                    ),
+
+                  const SizedBox(height: 30),
+                ],
+              );
+            },
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(users.length, (i) {
-          final data = users[i].data() as Map<String, dynamic>;
-          final rank = i + 1;
+    );
+  }
 
-          return Column(
-            children: [
-              Text(
-                "#$rank",
-                style: TextStyle(
-                  fontSize: 16,
-                  letterSpacing: 1,
-                  color: rank == 1 ? AppColor.primary : AppColor.secondary,
-                  fontWeight: FontWeight.w900,
-                ),
+  // ===============================================================
+  // PAGE HEADER
+  // ===============================================================
+
+  Widget _pageHeader() {
+    return const SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Icon(
+            Icons.workspace_premium_outlined,
+            size: 31,
+            color: AppColor.primary,
+          ),
+
+          SizedBox(height: 9),
+
+          TextWidget(
+            "Leaderboard",
+            size: 27,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+            align: TextAlign.center,
+          ),
+
+          SizedBox(height: 5),
+
+          TextWidget(
+            "Top responders worldwide",
+            size: 12.5,
+            color: AppColor.textMuted,
+            align: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================================================
+  // EMPTY LEADERBOARD
+  // ===============================================================
+
+  Widget _emptyState() {
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 70,
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColor.primarySoft,
+                borderRadius:
+                    BorderRadius.circular(24),
               ),
-
-              const SizedBox(height: 8),
-
-              CircleAvatar(
-                radius: rank == 1 ? 48 : 32,
-                backgroundColor: AppColor.primary.withOpacity(0.20),
-                backgroundImage: data['profileImage'] != null
-                    ? NetworkImage(data['profileImage'])
-                    : null,
-                child: data['profileImage'] == null
-                    ? const Icon(Icons.person, color: Colors.white, size: 30)
-                    : null,
+              child: const Icon(
+                Icons.leaderboard_outlined,
+                color: AppColor.primary,
+                size: 34,
               ),
+            ),
+            const SizedBox(height: 18),
+            const TextWidget(
+              "No leaderboard data",
+              size: 17,
+              weight: FontWeight.w900,
+              color: AppColor.text,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 10),
-
-              Text(
-                data['name'] ?? 'User',
-                style: const TextStyle(
-                  color: AppColor.text,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                "${data['totalXP'] ?? 0} XP",
-                style: const TextStyle(
-                  color: AppColor.primary,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          );
-        }),
+  Widget _topThreeOnly() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 15,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColor.border,
+        ),
+      ),
+      child: const TextWidget(
+        "No additional rankings yet",
+        size: 12,
+        color: AppColor.textMuted,
+        align: TextAlign.center,
       ),
     );
   }
 }
 
-/// Individual leaderboard list tile for ranks below top 3
-class _LeaderboardTile extends StatelessWidget {
-  final int rank;
-  final String name;
-  final int xp;
-  final String? image;
+// =================================================================
+// #1 CHAMPION CARD
+// =================================================================
 
-  const _LeaderboardTile({
+class _ChampionCard extends StatelessWidget {
+  const _ChampionCard({
+    required this.user,
+  });
+
+  final QueryDocumentSnapshot user;
+
+  @override
+  Widget build(BuildContext context) {
+    final data =
+        user.data() as Map<String, dynamic>;
+
+    final name =
+        data['name'] ?? 'User';
+
+    final xp =
+        data['totalXP'] ?? 0;
+
+    final image =
+        data['profileImage'];
+
+    final hasImage =
+        image != null &&
+        image.toString().trim().isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+
+      decoration: BoxDecoration(
+        color: AppColor.secondary,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.secondary
+                .withOpacity(0.16),
+            blurRadius: 22,
+            offset: const Offset(0, 11),
+          ),
+        ],
+      ),
+
+      child: Row(
+        children: [
+          // =======================================================
+          // AVATAR
+          // =======================================================
+
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 78,
+                height: 78,
+                padding: const EdgeInsets.all(3),
+
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white
+                        .withOpacity(0.28),
+                    width: 2,
+                  ),
+                ),
+
+                child: CircleAvatar(
+                  backgroundColor:
+                      Colors.white.withOpacity(0.12),
+                  backgroundImage: hasImage
+                      ? NetworkImage(
+                          image.toString(),
+                        )
+                      : null,
+                  child: !hasImage
+                      ? const Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 31,
+                        )
+                      : null,
+                ),
+              ),
+
+              Positioned(
+                right: -3,
+                bottom: -2,
+                child: Container(
+                  width: 29,
+                  height: 29,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColor.warning,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColor.secondary,
+                      width: 3,
+                    ),
+                  ),
+                  child: const Text(
+                    "1",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight:
+                          FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(width: 18),
+
+          // =======================================================
+          // DETAILS
+          // =======================================================
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  name.toString(),
+                  size: 18,
+                  weight: FontWeight.w900,
+                  color: Colors.white,
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                ),
+
+                const SizedBox(height: 4),
+
+                TextWidget(
+                  "Current leader",
+                  size: 11.5,
+                  color: Colors.white
+                      .withOpacity(0.65),
+                ),
+
+                const SizedBox(height: 13),
+
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white
+                            .withOpacity(0.10),
+                        borderRadius:
+                            BorderRadius.circular(
+                          12,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize:
+                            MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.bolt_rounded,
+                            size: 17,
+                            color:
+                                AppColor.warning,
+                          ),
+                          const SizedBox(width: 5),
+                          TextWidget(
+                            "$xp XP",
+                            size: 12,
+                            weight:
+                                FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white
+                  .withOpacity(0.09),
+              borderRadius:
+                  BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.emoji_events_outlined,
+              color: AppColor.warning,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =================================================================
+// #2 + #3 CARDS
+// =================================================================
+
+class _RunnerCard extends StatelessWidget {
+  const _RunnerCard({
+    required this.rank,
+    required this.user,
+  });
+
+  final int rank;
+  final QueryDocumentSnapshot user;
+
+  @override
+  Widget build(BuildContext context) {
+    final data =
+        user.data() as Map<String, dynamic>;
+
+    final name =
+        data['name'] ?? 'User';
+
+    final xp =
+        data['totalXP'] ?? 0;
+
+    final image =
+        data['profileImage'];
+
+    final hasImage =
+        image != null &&
+        image.toString().trim().isNotEmpty;
+
+    final accent = rank == 2
+        ? AppColor.info
+        : AppColor.warning;
+
+    return Container(
+      height: 176,
+      padding: const EdgeInsets.all(15),
+
+      decoration: BoxDecoration(
+        color: AppColor.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColor.border,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.shadow,
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+
+                decoration: BoxDecoration(
+                  color:
+                      accent.withOpacity(0.10),
+                  borderRadius:
+                      BorderRadius.circular(10),
+                ),
+
+                child: Text(
+                  "#$rank",
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight:
+                        FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+
+              const Spacer(),
+
+              Icon(
+                rank == 2
+                    ? Icons
+                        .military_tech_outlined
+                    : Icons
+                        .workspace_premium_outlined,
+                size: 20,
+                color: accent,
+              ),
+            ],
+          ),
+
+          const Spacer(),
+
+          CircleAvatar(
+            radius: 26,
+            backgroundColor:
+                accent.withOpacity(0.10),
+            backgroundImage: hasImage
+                ? NetworkImage(
+                    image.toString(),
+                  )
+                : null,
+            child: !hasImage
+                ? Icon(
+                    Icons.person_rounded,
+                    color: accent,
+                    size: 24,
+                  )
+                : null,
+          ),
+
+          const SizedBox(height: 10),
+
+          TextWidget(
+            name.toString(),
+            size: 13.5,
+            weight: FontWeight.w900,
+            color: AppColor.text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          const SizedBox(height: 3),
+
+          TextWidget(
+            "$xp XP",
+            size: 11,
+            weight: FontWeight.w800,
+            color: accent,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =================================================================
+// NORMAL RANKING ROW
+// =================================================================
+
+class _RankingRow extends StatelessWidget {
+  const _RankingRow({
     required this.rank,
     required this.name,
     required this.xp,
     this.image,
   });
 
+  final int rank;
+  final String name;
+  final int xp;
+  final String? image;
+
   @override
   Widget build(BuildContext context) {
+    final hasImage =
+        image != null &&
+        image!.trim().isNotEmpty;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(
+        bottom: 10,
+      ),
+
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 13,
+      ),
+
       decoration: BoxDecoration(
         color: AppColor.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.primary.withOpacity(0.07),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: AppColor.border,
+        ),
       ),
+
       child: Row(
         children: [
-          Text(
-            "#$rank",
-            style: const TextStyle(
+          // =======================================================
+          // RANK
+          // =======================================================
+
+          SizedBox(
+            width: 34,
+            child: TextWidget(
+              rank.toString().padLeft(2, '0'),
+              size: 12,
+              weight: FontWeight.w900,
               color: AppColor.textMuted,
-              fontWeight: FontWeight.w900,
             ),
           ),
 
-          const SizedBox(width: 14),
+          // =======================================================
+          // AVATAR
+          // =======================================================
 
           CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey.shade300,
-            backgroundImage: image != null ? NetworkImage(image!) : null,
-            child: image == null
-                ? const Icon(Icons.person, color: Colors.white)
+            radius: 21,
+            backgroundColor:
+                AppColor.primarySoft,
+            backgroundImage: hasImage
+                ? NetworkImage(image!)
+                : null,
+            child: !hasImage
+                ? const Icon(
+                    Icons.person_outline_rounded,
+                    color: AppColor.primary,
+                    size: 20,
+                  )
                 : null,
           ),
 
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
+
+          // =======================================================
+          // NAME
+          // =======================================================
 
           Expanded(
-            child: Text(
+            child: TextWidget(
               name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColor.text,
-              ),
+              size: 13.5,
+              weight: FontWeight.w800,
+              color: AppColor.text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
 
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                "$xp XP",
-                style: const TextStyle(
+          const SizedBox(width: 8),
+
+          // =======================================================
+          // XP
+          // =======================================================
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 7,
+            ),
+
+            decoration: BoxDecoration(
+              color: AppColor.inputFill,
+              borderRadius:
+                  BorderRadius.circular(11),
+            ),
+
+            child: Row(
+              mainAxisSize:
+                  MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.bolt_rounded,
                   color: AppColor.primary,
-                  fontWeight: FontWeight.w900,
+                  size: 15,
                 ),
-              ),
 
-              const SizedBox(height: 6),
+                const SizedBox(width: 4),
 
-              Container(
-                width: 74,
-                height: 7,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColor.primary,
-                      AppColor.safeGreen.withOpacity(0.95),
-                    ],
-                  ),
+                TextWidget(
+                  "$xp",
+                  size: 11,
+                  weight:
+                      FontWeight.w900,
+                  color: AppColor.text,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

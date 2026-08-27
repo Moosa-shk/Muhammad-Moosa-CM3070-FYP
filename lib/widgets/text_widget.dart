@@ -2,44 +2,27 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../config/colors.dart';
 
-/// TextWidget
+/// Reusable typography widget.
 ///
-/// A reusable custom text component used across the DisasterAid application.
-/// It standardizes typography by applying the **Plus Jakarta Sans** font
-/// and predefined styling options.
-///
-/// Advantages of using this widget:
-/// • Ensures consistent typography across the entire app
-/// • Reduces repetitive TextStyle code
-/// • Allows flexible customization (size, color, weight, alignment)
-/// • Improves maintainability of UI design
+/// Public API is unchanged.
 class TextWidget extends StatelessWidget {
-
-  /// The text content to be displayed
   final String text;
 
-  /// Font size of the text
   final double size;
 
-  /// Font weight (e.g., bold, medium)
   final FontWeight weight;
 
-  /// Optional color override
-  /// If not provided, the default app text color is used
   final Color? color;
 
-  /// Text alignment within the widget
   final TextAlign align;
 
-  /// Maximum number of lines allowed before truncation
   final int? maxLines;
 
-  /// Overflow behavior when text exceeds max lines
   final TextOverflow? overflow;
 
-  /// Constructor with configurable parameters
   const TextWidget(
     this.text, {
     super.key,
@@ -56,24 +39,62 @@ class TextWidget extends StatelessWidget {
     return Text(
       text,
 
-      /// Align text horizontally
       textAlign: align,
 
-      /// Restrict number of lines if specified
       maxLines: maxLines,
 
-      /// Define overflow behavior (ellipsis, fade, etc.)
       overflow: overflow,
 
-      /// Apply Google Fonts styling
-      /// Plus Jakarta Sans provides a modern readable font
       style: GoogleFonts.plusJakartaSans(
         fontSize: size,
+
         fontWeight: weight,
 
-        /// Use custom color or fallback to default theme text color
         color: color ?? AppColor.text,
+
+        height: _heightForSize(size),
+
+        letterSpacing: _spacingForSize(
+          size,
+          weight,
+        ),
       ),
     );
+  }
+
+  double _heightForSize(double value) {
+    if (value >= 26) {
+      return 1.08;
+    }
+
+    if (value >= 20) {
+      return 1.16;
+    }
+
+    if (value >= 16) {
+      return 1.35;
+    }
+
+    return 1.40;
+  }
+
+  double _spacingForSize(
+    double value,
+    FontWeight fontWeight,
+  ) {
+    if (value >= 26) {
+      return -0.65;
+    }
+
+    if (value >= 20) {
+      return -0.30;
+    }
+
+    if (value >= 17 &&
+        fontWeight.index >= FontWeight.w700.index) {
+      return -0.10;
+    }
+
+    return 0;
   }
 }

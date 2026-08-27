@@ -13,10 +13,6 @@ import '../../widgets/text_widget.dart';
 import '../auth/auth_controller.dart';
 import '../auth/info_screen.dart';
 
-/// Settings screen of the DisasterAid application.
-/// This screen allows users to manage their profile information,
-/// access notification settings, view privacy information,
-/// and log out from the application.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -26,238 +22,606 @@ class SettingsScreen extends StatelessWidget {
 
     return AppScaffold(
       title: "Settings",
-      subtitle: "Profile and preferences",
+      subtitle: "Your RescueAid control center",
       scroll: true,
       padding: const EdgeInsets.symmetric(horizontal: 20),
 
-      /// Bottom navigation used throughout the app
-      bottomNavigationBar: const BottomNavBar(currentIndex: 4),
+      bottomNavigationBar: const BottomNavBar(
+        currentIndex: 4,
+      ),
 
-      /// Reactive UI that updates automatically when user data changes
       child: Obx(() {
         final user = auth.currentUser.value;
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _profileCard(user),
-            const SizedBox(height: 18),
+            _identityStrip(user),
 
-            /// Language preference tile (UI only in current version)
-            _tile(
-              Icons.language_rounded,
-              "Language",
-              "English (default)",
-              () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Language change UI only")),
-              ),
-            ),
+            const SizedBox(height: 26),
 
-            /// Navigate to notification management screen
-            _tile(
-              Icons.notifications_rounded,
-              "Notifications",
-              "Manage alert preferences",
-              () => Get.to(() => NotificationsScreen()),
-            ),
-
-            /// Privacy policy section
-            _tile(
-              Icons.shield_rounded,
-              "Privacy Policy",
-              "Read our privacy policy",
-              () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Privacy policy UI only")),
-              ),
-            ),
-
-            /// Application information dialog
-            _tile(
-              Icons.info_outline_rounded,
-              "About App",
-              "Version 1.0.0",
-              () => showAboutDialog(
-                context: context,
-                applicationName: "DisasterAid",
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            /// Logout button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.primary,
-                  elevation: 10,
-                  shadowColor: AppColor.primary.withOpacity(0.35),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+            Row(
+              children: [
+                const Expanded(
+                  child: TextWidget(
+                    "Control Center",
+                    size: 18,
+                    weight: FontWeight.w800,
+                    color: AppColor.text,
                   ),
                 ),
-                onPressed: () async {
-                  await auth.logout();
-                  Get.offAll(() => const LoginScreen(),
-                      transition: Transition.fadeIn);
-                },
-                child: const TextWidget(
-                  "Log Out",
-                  color: Colors.white,
-                  weight: FontWeight.w900,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColor.primarySoft,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const TextWidget(
+                    "4 OPTIONS",
+                    size: 10,
+                    weight: FontWeight.w800,
+                    color: AppColor.primary,
+                  ),
                 ),
-              ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _compactBentoCard(
+                    icon: Icons.language_rounded,
+                    title: "Language",
+                    value: "English",
+                    hint: "Default",
+                    accent: AppColor.info,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Language change UI only",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                Expanded(
+                  child: _compactBentoCard(
+                    icon: Icons.shield_outlined,
+                    title: "Privacy",
+                    value: "Protected",
+                    hint: "View policy",
+                    accent: AppColor.safeGreen,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Privacy policy UI only",
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            _aboutCard(
+              onTap: () {
+                showAboutDialog(
+                  context: context,
+                  applicationName: "RescueAid",
+                );
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            _featuredNotificationsCard(
+              onTap: () {
+                Get.to(
+                  () => NotificationsScreen(),
+                );
+              },
             ),
 
             const SizedBox(height: 26),
+
+            const TextWidget(
+              "Account",
+              size: 15,
+              weight: FontWeight.w800,
+              color: AppColor.text,
+            ),
+
+            const SizedBox(height: 10),
+
+            _logoutAction(
+              onTap: () async {
+                await auth.logout();
+
+                Get.offAll(
+                  () => const LoginScreen(),
+                  transition: Transition.fadeIn,
+                );
+              },
+            ),
+
+            const SizedBox(height: 30),
           ],
         );
       }),
     );
   }
 
-  /// Displays the user profile information card
-  /// including profile image, name, email, phone, and blood group.
-  Widget _profileCard(dynamic user) {
+  Widget _identityStrip(dynamic user) {
+    final hasImage = user?.profileImage != null &&
+        user.profileImage.toString().trim().isNotEmpty;
+
+    final phone = (user?.phone ?? "").toString();
+    final blood = (user?.bloodGroup ?? "").toString();
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        16,
+        14,
+        16,
+      ),
       decoration: BoxDecoration(
         color: AppColor.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColor.border),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColor.border,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: AppColor.shadow,
+            blurRadius: 16,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-
-          /// User profile avatar
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.grey.shade300,
-            backgroundImage: (user?.profileImage != null &&
-                    user.profileImage.toString().isNotEmpty)
-                ? CachedNetworkImageProvider(user.profileImage)
-                : null,
-            child: (user?.profileImage == null ||
-                    user.profileImage.toString().isEmpty)
-                ? const Icon(Icons.person, size: 30, color: Colors.grey)
-                : null,
+          Container(
+            width: 58,
+            height: 58,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: AppColor.primarySoft,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: hasImage
+                  ? CachedNetworkImage(
+                      imageUrl: user.profileImage,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      color: AppColor.primarySoft,
+                      child: const Icon(
+                        Icons.person_rounded,
+                        size: 28,
+                        color: AppColor.primary,
+                      ),
+                    ),
+            ),
           ),
 
           const SizedBox(width: 14),
 
-          /// User information
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextWidget(
                   user?.name ?? "User",
-                  size: 16,
-                  weight: FontWeight.w900,
+                  size: 17,
+                  weight: FontWeight.w800,
                   color: AppColor.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+
+                const SizedBox(height: 3),
 
                 if (user?.email != null)
                   TextWidget(
                     user.email,
-                    size: 13,
-                    color: AppColor.textMuted,
-                  ),
-
-                if ((user?.phone ?? "").toString().isNotEmpty)
-                  TextWidget(
-                    "Phone: ${user.phone}",
                     size: 12,
                     color: AppColor.textMuted,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
 
-                if ((user?.bloodGroup ?? "").toString().isNotEmpty)
-                  TextWidget(
-                    "Blood group: ${user.bloodGroup}",
-                    size: 12,
-                    color: AppColor.textMuted,
+                if (phone.isNotEmpty || blood.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      if (phone.isNotEmpty)
+                        _profileChip(
+                          Icons.phone_outlined,
+                          phone,
+                        ),
+                      if (blood.isNotEmpty)
+                        _profileChip(
+                          Icons.bloodtype_outlined,
+                          blood,
+                        ),
+                    ],
                   ),
+                ],
               ],
             ),
           ),
 
-          /// Edit profile button
-          IconButton(
-            icon: Icon(Icons.edit, color: AppColor.primary),
-            onPressed: () => Get.to(() => const InfoScreen(),
-                transition: Transition.rightToLeft),
+          const SizedBox(width: 10),
+
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {
+              Get.to(
+                () => const InfoScreen(),
+                transition: Transition.rightToLeft,
+              );
+            },
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColor.secondary,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.edit_outlined,
+                size: 19,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Reusable tile widget used for different settings options
-  /// such as notifications, language, privacy policy, etc.
-  Widget _tile(
+  Widget _profileChip(
     IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
+    String text,
   ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColor.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColor.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.inputFill,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: AppColor.border,
         ),
-        child: Row(
-          children: [
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: AppColor.primary,
+          ),
+          const SizedBox(width: 5),
+          TextWidget(
+            text,
+            size: 10,
+            weight: FontWeight.w700,
+            color: AppColor.textMuted,
+          ),
+        ],
+      ),
+    );
+  }
 
-            /// Icon representing the settings option
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColor.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColor.primary.withOpacity(0.18)),
+  Widget _featuredNotificationsCard({
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColor.secondary,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.secondary.withOpacity(0.18),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
-              child: Icon(icon, color: AppColor.primary),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(
+                  Icons.notifications_active_outlined,
+                  color: Colors.white,
+                  size: 25,
+                ),
+              ),
+
+              const SizedBox(width: 15),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "Notifications",
+                      size: 16,
+                      weight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                    SizedBox(height: 4),
+                    TextWidget(
+                      "Manage emergency alerts and updates",
+                      size: 12,
+                      color: Color(0xD8FFFFFF),
+                    ),
+                  ],
+                ),
+              ),
+
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _compactBentoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required String hint,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          height: 162,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColor.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColor.border,
             ),
-
-            const SizedBox(width: 14),
-
-            /// Title and description of the setting
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.shadow,
+                blurRadius: 14,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  TextWidget(title,
-                      size: 15, weight: FontWeight.w900, color: AppColor.text),
-                  const SizedBox(height: 6),
-                  TextWidget(subtitle, size: 13, color: AppColor.textMuted),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.11),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: accent,
+                      size: 21,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.north_east_rounded,
+                    color: AppColor.textMuted,
+                    size: 18,
+                  ),
                 ],
               ),
-            ),
 
-            const Icon(Icons.arrow_forward_ios_rounded,
-                size: 16, color: AppColor.textMuted),
-          ],
+              const Spacer(),
+
+              TextWidget(
+                title,
+                size: 13,
+                weight: FontWeight.w700,
+                color: AppColor.textMuted,
+              ),
+
+              const SizedBox(height: 3),
+
+              TextWidget(
+                value,
+                size: 17,
+                weight: FontWeight.w800,
+                color: AppColor.text,
+              ),
+
+              const SizedBox(height: 3),
+
+              TextWidget(
+                hint,
+                size: 10.5,
+                color: AppColor.textMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _aboutCard({
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(17),
+          decoration: BoxDecoration(
+            color: AppColor.primarySoft,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColor.primary.withOpacity(0.12),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColor.primary,
+                  size: 22,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      "About RescueAid",
+                      size: 14.5,
+                      weight: FontWeight.w800,
+                      color: AppColor.text,
+                    ),
+                    SizedBox(height: 3),
+                    TextWidget(
+                      "Application information • v1.0.0",
+                      size: 11.5,
+                      color: AppColor.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColor.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _logoutAction({
+    required Future<void> Function() onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () async {
+          await onTap();
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 15,
+          ),
+          decoration: BoxDecoration(
+            color: AppColor.dangerSoft,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColor.danger.withOpacity(0.18),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                color: AppColor.danger,
+                size: 21,
+              ),
+
+              SizedBox(width: 12),
+
+              Expanded(
+                child: TextWidget(
+                  "Log out",
+                  size: 14,
+                  weight: FontWeight.w800,
+                  color: AppColor.danger,
+                ),
+              ),
+
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: AppColor.danger,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
